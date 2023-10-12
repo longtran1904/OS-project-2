@@ -1,8 +1,8 @@
 // File:	worker_t.h
 
-// List all group member's name:
-// username of iLab:
-// iLab Server:
+// List all group member's name: Long Tran, Darren Jiang
+// username of iLab: lht21
+// iLab Server: vi.cs.rutgers.edu -> ssh cs416f23-51
 
 #ifndef WORKER_T_H
 #define WORKER_T_H
@@ -21,6 +21,12 @@
 
 typedef uint worker_t;
 
+typedef enum {
+	READY = 0,
+	SCHEDULED = 1,
+	BLOCKED = 2
+} t_status;
+
 typedef struct TCB {
 	/* add important states in a thread control block */
 	// thread Id
@@ -31,6 +37,9 @@ typedef struct TCB {
 	// And more ...
 
 	// YOUR CODE HERE
+	worker_t id;
+	t_status status;
+	ucontext_t* context;
 } tcb; 
 
 /* mutex struct definition */

@@ -5,13 +5,15 @@
 // iLab Server:
 
 #include "thread-worker.h"
+#include "runqueue.c"
+#define STACK_SIZE SIGSTKSZ
 
 //Global counter for total context switches and 
 //average turn around and response time
 long tot_cntx_switches=0;
 double avg_turn_time=0;
 double avg_resp_time=0;
-
+node* runqueue = NULL;
 
 // INITAILIZE ALL YOUR OTHER VARIABLES HERE
 // YOUR CODE HERE
@@ -28,6 +30,40 @@ int worker_create(worker_t * thread, pthread_attr_t * attr,
        // - make it ready for the execution.
 
        // YOUR CODE HERE
+		ucontext_t cctx;
+		if (getcontext(&cctx) < 0){
+			perror("getcontext");
+			exit(1);
+		}
+
+		// Allocate space for stack
+		void *stack=malloc(STACK_SIZE);
+		
+		if (stack == NULL){
+			perror("Failed to allocate stack");
+			exit(1);
+		}
+		
+		/* Setup context that we are going to use */
+		cctx.uc_link=NULL;
+		cctx.uc_stack.ss_sp=stack;
+		cctx.uc_stack.ss_size=STACK_SIZE;
+		cctx.uc_stack.ss_flags=0;
+		
+		puts(" about to call make  context");
+		
+		// Setup the context to start running at simplef
+		makecontext(&cctx,(void *)&function,0);		
+
+		//create Thread Context Block
+		tcb block;
+		block.id = thread;
+		block.context = &cctx;
+		block.status = READY;
+
+		// push thread to run queue
+		queue_add(runqueue, block);
+
 	
     return 0;
 };
