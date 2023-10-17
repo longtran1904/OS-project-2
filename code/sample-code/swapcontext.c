@@ -9,12 +9,12 @@
 
 void*  f1withparam(ucontext_t *nctx){
 	puts("Donald- you are threaded\n");
-	setcontext(nctx);
+	// setcontext(nctx);
 	/* setcontext sets PC <--value in nctx context*/
 }
 
 int main(int argc, char **argv) {
-	ucontext_t cctx,nctx;
+	ucontext_t cctx,nctx,main_ctx;
 	
 	if (argc != 1) {
 		printf(": USAGE Program Name and no Arguments expected\n");
@@ -35,7 +35,11 @@ int main(int argc, char **argv) {
 	}
       
 	/* Setup context that we are going to use */
-	cctx.uc_link=NULL;
+	if (getcontext(&main_ctx) < 0){
+		perror("getcontext");
+		exit(1);
+	}	
+	cctx.uc_link=&main_ctx;
 	cctx.uc_stack.ss_sp=stack;
 	cctx.uc_stack.ss_size=STACK_SIZE;
 	cctx.uc_stack.ss_flags=0;
@@ -48,7 +52,7 @@ int main(int argc, char **argv) {
 	puts("Successfully modified context");
 	
 	/* swap context will activate cctx and store location after swapcontext in nctx */
-	swapcontext(&nctx,&cctx);
+	setcontext(&cctx);
 
 	/* PC value in nctx will point to here */
 	puts("swap  context executed correctly \n");

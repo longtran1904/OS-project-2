@@ -19,5 +19,8 @@ else
 	echo "no such scheduling algorithm"
 endif
 
+test: thread-worker.c test.c
+	$(CC) -g $^ -o test
+
 clean:
 	rm -rf testfile *.o *.a

@@ -18,13 +18,15 @@
 #include <sys/types.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <ucontext.h>
 
 typedef uint worker_t;
 
 typedef enum {
 	READY = 0,
-	SCHEDULED = 1,
-	BLOCKED = 2
+	RUNNING = 1,
+	BLOCKED = 2,
+	DONE = 3
 } t_status;
 
 typedef struct TCB {
@@ -37,7 +39,8 @@ typedef struct TCB {
 	// And more ...
 
 	// YOUR CODE HERE
-	worker_t id;
+	int testno;
+	worker_t* id;
 	t_status status;
 	ucontext_t* context;
 } tcb; 
@@ -68,7 +71,7 @@ int worker_yield();
 void worker_exit(void *value_ptr);
 
 /* wait for thread termination */
-int worker_join(worker_t thread, void **value_ptr);
+int worker_join(worker_t* thread, void **value_ptr);
 
 /* initial the mutex lock */
 int worker_mutex_init(worker_mutex_t *mutex, const pthread_mutexattr_t
