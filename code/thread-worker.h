@@ -29,6 +29,11 @@ typedef enum {
 	DONE = 3
 } t_status;
 
+typedef enum {
+	UNLOCKED = 0,
+	LOCKED = 1
+} mut_status;
+
 typedef struct TCB {
 	/* add important states in a thread control block */
 	// thread Id
@@ -48,8 +53,9 @@ typedef struct TCB {
 /* mutex struct definition */
 typedef struct worker_mutex_t {
 	/* add something here */
-
 	// YOUR CODE HERE
+	tcb* thread_block;
+	mut_status status;
 } worker_mutex_t;
 
 /* define your data structures here: */
@@ -71,7 +77,7 @@ int worker_yield();
 void worker_exit(void *value_ptr);
 
 /* wait for thread termination */
-int worker_join(worker_t* thread, void **value_ptr);
+int worker_join(worker_t thread, void **value_ptr);
 
 /* initial the mutex lock */
 int worker_mutex_init(worker_mutex_t *mutex, const pthread_mutexattr_t

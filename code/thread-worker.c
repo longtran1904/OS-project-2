@@ -6,10 +6,12 @@
 
 #include "thread-worker.h" 
 #include "run_queue.c"
+#include "block_list.c"
 #include <signal.h>
 #include <time.h>
 #include <string.h>
 #include <sys/time.h>
+
 #define STACK_SIZE SIGSTKSZ
 
 #define YELLOW "\033[0;33m"
@@ -26,7 +28,9 @@ double avg_resp_time=0;
 // YOUR CODE HERE
 static int callno = 0;
 static node* runqueue = NULL;
+static block_node* blocklist = NULL;
 static ucontext_t sched_ctx;
+static ucontext_t caller_sched;
 static ucontext_t main_ctx;
 static volatile sig_atomic_t switch_context = 0;
 
@@ -62,6 +66,10 @@ static void schedule() {
 					queue_add(&runqueue, block);
 					queue_pop(&runqueue);
 					printf("thread %d is done! pushing it back...\n", *(block->id));
+				}
+				else if (block->status == RUNNING) {
+					printf("thread is running... continue...\n");
+					setcontext(&caller_sched);
 				}
 			
 
@@ -104,7 +112,8 @@ static void sched_mlfq() {
 static void ring(int signum){
 	switch_context = 1;
 	printf(YELLOW "RING RING! The timer has gone off\n" RESET);
-	swapcontext(&main_ctx, &sched_ctx);
+
+	swapcontext(&caller_sched, &sched_ctx);
 }
 
 int worker_init(){
@@ -266,6 +275,10 @@ int worker_join(worker_t thread, void **value_ptr) {
 	// YOUR CODE HERE  
 	node* n = queue_front(&runqueue);
 	printf("waiting for thread %d\n", thread);
+	if (getcontext(&main_ctx) < 0){
+		perror("get main_ctx");
+		exit(1);
+	}
 	while (*(n->t_block->id) != thread || (n->t_block->status != DONE)){
 		//DO NOTHING
 	}
@@ -291,19 +304,40 @@ int worker_mutex_init(worker_mutex_t *mutex,
 	//- initialize data structures for this mutex
 
 	// YOUR CODE HERE
+	mutex = malloc(sizeof(worker_mutex_t));
+	mutex->status = UNLOCKED;
+
 	return 0;
 };
 
 /* aquire the mutex lock */
 int worker_mutex_lock(worker_mutex_t *mutex) {
 
-        // - use the built-in test-and-set atomic function to test the mutex
-        // - if the mutex is acquired successfully, enter the critical section
-        // - if acquiring mutex fails, push current thread into block list and
-        // context switch to the scheduler thread
+	// - use the built-in test-and-set atomic function to test the mutex
+	// - if the mutex is acquired successfully, enter the critical section
+	// - if acquiring mutex fails, push current thread into block list and
+	// context switch to the scheduler thread
 
-        // YOUR CODE HERE
-        return 0;
+	// YOUR CODE HERE
+	node* n = queue_front(&runqueue); 
+	tcb* block = n->t_block;
+	if (mutex->status == UNLOCKED){
+		mutex->status = LOCKED;
+		// record which thread is holding lock
+		mutex->thread_block = block;
+	} else{
+		queue_pop(&runqueue); // remove thread from runqueue
+
+		block_node* new_block_node = malloc(sizeof(block_node));
+		new_block_node->mutex = mutex;
+		new_block_node->current_thread = n;
+		new_block_node->current_thread->t_block->status = BLOCKED;
+		new_block_node->next = NULL;
+		list_add(&blocklist, new_block_node); // record whole thread node on queue
+		setcontext(&sched_ctx);
+	}
+
+	return 0;
 };
 
 /* release the mutex lock */
@@ -311,6 +345,17 @@ int worker_mutex_unlock(worker_mutex_t *mutex) {
 	// - release mutex and make it available again. 
 	// - put threads in block list to run queue 
 	// so that they could compete for mutex later.
+
+	if (mutex->status == LOCKED){
+		mutex->status = UNLOCKED;
+		block_node* pop;
+		while(!list_empty(&blocklist) && ((pop = list_find(&blocklist, mutex)) != NULL)){
+			// release blocked threads to runqueue again
+			pop->current_thread->t_block->status = READY;
+			queue_add(&runqueue, pop->current_thread->t_block);
+			free(pop);
+		}
+	}
 
 	// YOUR CODE HERE
 	return 0;
