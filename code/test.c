@@ -18,7 +18,20 @@ void *PrintHello(void *threadid)
    long tid;
    tid = (long)threadid;
    printf("Hello World! It's me, thread #%ld!\n", tid);
+
    worker_exit(NULL);
+}
+
+void *PrintHelloYield(void *threadid){
+	long tid;
+	tid = (long)threadid;
+	printf("Hello World! It's me, thread #%ld!\n", tid);
+
+	worker_yield();
+
+	printf("Hello! It's thread #%ld again!\n", tid);
+
+	worker_exit(NULL);	
 }
 
 int main(int argc, char **argv) {
@@ -27,13 +40,13 @@ int main(int argc, char **argv) {
 
 	worker_t thread1, thread2, thread3, thread4;
 	int stat;
-	stat = worker_create(&thread1, NULL, (void*) PrintHello, (void *)1);
+	stat = worker_create(&thread1, NULL, (void*) PrintHelloYield, (void *)0);
 	if (stat == 0){
-		printf("thread 1 created!! value: %p\n", &thread1);
+		printf("thread %d created!! value: %d\n", thread1, thread1);
 	}
-	stat = worker_create(&thread2, NULL, (void*) PrintHello, (void *)2);
+	stat = worker_create(&thread2, NULL, (void*) PrintHello, (void *)1);
 	if (stat == 0){
-		printf("thread 2 created!! value: %p\n", &thread2);
+		printf("thread %d created!! value: %d\n", thread2, thread2);
 	}
 	// stat = worker_create(&thread3, NULL, (void*) PrintHello, (void *)3);
 	// if (stat == 0){
@@ -44,8 +57,8 @@ int main(int argc, char **argv) {
 	// 	puts("thread 4 created!!\n");
 	// }
 
-	stat = worker_join(&thread1, NULL);
-	stat = worker_join(&thread2, NULL);
+	stat = worker_join(thread1, NULL);
+	stat = worker_join(thread2, NULL);
 
 	puts("finished\n");
 

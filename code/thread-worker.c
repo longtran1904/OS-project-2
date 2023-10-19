@@ -12,6 +12,10 @@
 #include <sys/time.h>
 #define STACK_SIZE SIGSTKSZ
 
+#define YELLOW "\033[0;33m"
+#define GREEN "\e[0;32m"
+#define RESET  "\033[0m"
+
 //Global counter for total context switches and 
 //average turn around and response time
 long tot_cntx_switches=0;
@@ -41,17 +45,25 @@ static void schedule() {
 	// 		sched_mlfq();
 
 	// YOUR CODE HERE
-	printf("swapped to scheduler\n");
 	while ( 1 == 1 ){
 		//printf("Hello World from schedule context!!!\n");
 		if (!is_empty(&runqueue)){
 			// puts("queue not empty!!\n");
 			node* n = queue_front(&runqueue); // pop from queue - choose job to work
-			//deciphering to get and set context
+			//deciphering to get and set context)
 			tcb* block = n->t_block;
-			block->status = RUNNING;
-			printf("Executing thread %p\n", block->id); 
-			setcontext(block->context);
+			if (block->status == READY)
+			{
+				block->status = RUNNING;
+				printf("Executing thread %d\n", *(block->id)); 
+				setcontext(block->context);
+			}
+			else if (block->status == DONE){
+					queue_add(&runqueue, block);
+					queue_pop(&runqueue);
+					printf("thread %d is done! pushing it back...\n", *(block->id));
+				}
+			
 
 			// printf("freeing heap from thread\n");
 			// free(block->context->uc_stack.ss_sp);
@@ -91,7 +103,7 @@ static void sched_mlfq() {
 
 static void ring(int signum){
 	switch_context = 1;
-	printf("RING RING! The timer has gone off\n");
+	printf(YELLOW "RING RING! The timer has gone off\n" RESET);
 	swapcontext(&main_ctx, &sched_ctx);
 }
 
@@ -191,6 +203,8 @@ int worker_create(worker_t * thread, pthread_attr_t * attr,
 
 		//create Thread Context Block
 		tcb* block = malloc(sizeof(tcb));
+		// create id for thread
+		*thread = callno;
 		block->id = thread;
 		block->context = cctx;
 		block->status = READY;
@@ -212,58 +226,56 @@ int worker_yield() {
 	// - switch from thread context to scheduler context
 
 	// YOUR CODE HERE
-	ucontext_t current;
-	if (getcontext(&current) < 0){
+	ucontext_t* current = malloc(sizeof(ucontext_t));
+	if (getcontext(current) < 0){
 		perror("context yield");
 		exit(1);	
 	}
+
 	node* n = queue_front(&runqueue);
-	n->t_block->context = &current;
+	// free old context
+	free(n->t_block->context);
+	n->t_block->context = current;
 	n->t_block->status = READY;
-	queue_pop(&runqueue);
 	queue_add(&runqueue, n->t_block);
+	queue_pop(&runqueue);
+
+	printf(GREEN "thread #%d yielding...\n" RESET, *(n->t_block->id));
 	
-	swapcontext(&current, &sched_ctx);
+	swapcontext(current ,&sched_ctx);
 	return 0;
 };
 
 /* terminate a thread */
 void worker_exit(void *value_ptr) {
 	// - de-allocate any dynamic memory created when starting this thread
-
-	// YOUR CODE HERE
-	// ucontext_t current;
-	// if (getcontext(&current) < 0){
-	// 	perror("getcontext_exit");
-	// 	exit(1);
-	// }
-
-	// free(current.uc_stack.ss_sp);
 	
 	// set tcb to DONE -> ready for join()
 	node* n = queue_front(&runqueue);
 	n->t_block->status = DONE;
+
+	printf(GREEN "thread %d exited!\n" RESET, *(n->t_block->id));
 };
 
 
 /* Wait for thread termination */
-int worker_join(worker_t* thread, void **value_ptr) {
+int worker_join(worker_t thread, void **value_ptr) {
 	
 	// - wait for a specific thread to terminate
 	// - de-allocate any dynamic memory created by the joining thread
 	// YOUR CODE HERE  
 	node* n = queue_front(&runqueue);
-	printf("waiting for thread %p\n", thread);
-	while (n->t_block->id != thread || (n->t_block->status != DONE)){
+	printf("waiting for thread %d\n", thread);
+	while (*(n->t_block->id) != thread || (n->t_block->status != DONE)){
 		//DO NOTHING
 	}
 
 	//TODO free ucontext, block, stack
+	printf(GREEN "popping thread %d\n" RESET, *(n->t_block->id));
 	free(n->t_block->context->uc_stack.ss_sp);
 	free(n->t_block->context);
 	free(n->t_block);
 
-	printf("popping thread %p\n", n->t_block->id);
 	queue_pop(&runqueue);
 
 	if (is_empty(&runqueue))
