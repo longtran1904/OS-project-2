@@ -30,7 +30,7 @@ static int callno = 0;
 static node* runqueue = NULL;
 static block_node* blocklist = NULL;
 static ucontext_t sched_ctx;
-static ucontext_t caller_sched;
+static ucontext_t caller_sched; //context of caller
 static ucontext_t main_ctx;
 static volatile sig_atomic_t switch_context = 0;
 
