@@ -4,7 +4,7 @@
 // username of iLab:
 // iLab Server:
 
-#include "thread-worker.h" 
+#include "thread-worker.h"
 #include "run_queue.c"
 #include "block_list.c"
 #include <signal.h>
@@ -16,29 +16,29 @@
 
 #define YELLOW "\033[0;33m"
 #define GREEN "\e[0;32m"
-#define RESET  "\033[0m"
+#define RESET "\033[0m"
 
-//Global counter for total context switches and 
-//average turn around and response time
-long tot_cntx_switches=0;
-double avg_turn_time=0;
-double avg_resp_time=0;
+// Global counter for total context switches and
+// average turn around and response time
+long tot_cntx_switches = 0;
+double avg_turn_time = 0;
+double avg_resp_time = 0;
 
 // INITAILIZE ALL YOUR OTHER VARIABLES HERE
 // YOUR CODE HERE
 static int callno = 0;
-static node* runqueue = NULL;
-static block_node* blocklist = NULL;
+static node *runqueue = NULL;
+static block_node *blocklist = NULL;
 static ucontext_t sched_ctx;
-static ucontext_t caller_sched; //context of caller
+static ucontext_t caller_sched; // context of caller
 static ucontext_t main_ctx;
 static volatile sig_atomic_t switch_context = 0;
 
-
 /* scheduler */
-static void schedule() {
-	// - every time a timer interrupt occurs, your worker thread library 
-	// should be contexted switched from a thread context to this 
+static void schedule()
+{
+	// - every time a timer interrupt occurs, your worker thread library
+	// should be contexted switched from a thread context to this
 	// schedule() function
 
 	// - invoke scheduling algorithms according to the policy (PSJF or MLFQ)
@@ -49,87 +49,93 @@ static void schedule() {
 	// 		sched_mlfq();
 
 	// YOUR CODE HERE
-	while ( 1 == 1 ){
-		//printf("Hello World from schedule context!!!\n");
-		if (!is_empty(&runqueue)){
+	while (1 == 1)
+	{
+		// printf("Hello World from schedule context!!!\n");
+		if (!is_empty(&runqueue))
+		{
 			// puts("queue not empty!!\n");
-			node* n = queue_front(&runqueue); // pop from queue - choose job to work
-			//deciphering to get and set context)
-			tcb* block = n->t_block;
+			node *n = queue_front(&runqueue); // pop from queue - choose job to work
+			// deciphering to get and set context)
+			tcb *block = n->t_block;
 			if (block->status == READY)
 			{
 				block->status = RUNNING;
-				printf("Executing thread %d\n", *(block->id)); 
+				printf("Executing thread %d\n", *(block->id));
 				setcontext(block->context);
 			}
-			else if (block->status == DONE){
-					queue_add(&runqueue, block);
-					queue_pop(&runqueue);
-					printf("thread %d is done! pushing it back...\n", *(block->id));
-				}
-				else if (block->status == RUNNING) {
-					printf("thread is running... continue...\n");
-					setcontext(&caller_sched);
-				}
-			
+			else if (block->status == DONE)
+			{
+				queue_add(&runqueue, block);
+				queue_pop(&runqueue);
+				printf("thread %d is done! pushing it back...\n", *(block->id));
+			}
+			else if (block->status == RUNNING)
+			{
+				printf("thread is running... continue...\n");
+				setcontext(&caller_sched);
+			}
 
 			// printf("freeing heap from thread\n");
 			// free(block->context->uc_stack.ss_sp);
-		} else {
+		}
+		else
+		{
 			puts("queue is empty\n");
 			setcontext(&main_ctx);
 		}
 		// printf("scheduler action: %d\n", i++);
 	}
-	
 
 // - schedule policy
 #ifndef MLFQ
 	// Choose PSJF
-#else 
+#else
 	// Choose MLFQ
 #endif
-
 }
 
 /* Pre-emptive Shortest Job First (POLICY_PSJF) scheduling algorithm */
-static void sched_psjf() {
+static void sched_psjf()
+{
 	// - your own implementation of PSJF
 	// (feel free to modify arguments and return types)
 
 	// YOUR CODE HERE
 }
 
-
 /* Preemptive MLFQ scheduling algorithm */
-static void sched_mlfq() {
+static void sched_mlfq()
+{
 	// - your own implementation of MLFQ
 	// (feel free to modify arguments and return types)
 
 	// YOUR CODE HERE
 }
 
-static void ring(int signum){
+static void ring(int signum)
+{
 	switch_context = 1;
 	printf(YELLOW "RING RING! The timer has gone off\n" RESET);
 
 	swapcontext(&caller_sched, &sched_ctx);
 }
 
-int worker_init(){
+int worker_init()
+{
 	runqueue = NULL; // create scheduler queue
 
 	// create timer signal handler
 	struct sigaction sa;
-	memset (&sa, 0, sizeof (sa));
+	memset(&sa, 0, sizeof(sa));
 	sa.sa_handler = &ring; // call ring() whenever SIGPROF received
-	sigaction (SIGPROF, &sa, NULL);
+	sigaction(SIGPROF, &sa, NULL);
 
 	// Create timer struct
 	struct itimerval timer;
 
 	// Set up what the timer should reset to after the timer goes off
-	timer.it_interval.tv_usec = 0; 
+	timer.it_interval.tv_usec = 0;
 	timer.it_interval.tv_sec = 1;
 
 	// Set up the current timer to go off in 1 second
@@ -142,106 +148,113 @@ int worker_init(){
 	// Set the timer up (start the timer)
 	setitimer(ITIMER_PROF, &timer, NULL);
 
-	if (getcontext(&sched_ctx) < 0){
+	if (getcontext(&sched_ctx) < 0)
+	{
 		perror("get sched_ctx");
 		exit(1);
 	}
 	// Allocate space for stack
-	void *stack=malloc(STACK_SIZE);
-	
-	if (stack == NULL){
+	void *stack = malloc(STACK_SIZE);
+
+	if (stack == NULL)
+	{
 		perror("Failed to allocate stack");
 		exit(1);
 	}
-	
+
 	/* Setup context that we are going to use */
-	sched_ctx.uc_link=NULL;
-	sched_ctx.uc_stack.ss_sp=stack;
-	sched_ctx.uc_stack.ss_size=STACK_SIZE;
-	sched_ctx.uc_stack.ss_flags=0;
-	
+	sched_ctx.uc_link = NULL;
+	sched_ctx.uc_stack.ss_sp = stack;
+	sched_ctx.uc_stack.ss_size = STACK_SIZE;
+	sched_ctx.uc_stack.ss_flags = 0;
+
 	// Setup the context to start running at simplef
-	makecontext(&sched_ctx,(void *)&schedule,0);		
+	makecontext(&sched_ctx, (void *)&schedule, 0);
 
 	return 0;
 }
 
 /* create a new thread */
-int worker_create(worker_t * thread, pthread_attr_t * attr, 
-                      void *(*function)(void*), void * arg) {
+int worker_create(worker_t *thread, pthread_attr_t *attr,
+				  void *(*function)(void *), void *arg)
+{
 
-		// - create Thread Control Block (TCB)
-		// - create and initialize the context of this worker thread
-		// - allocate space of stack for this thread to run
-		// after everything is set, push this thread into run queue and 
-		// - make it ready for the execution.
+	// - create Thread Control Block (TCB)
+	// - create and initialize the context of this worker thread
+	// - allocate space of stack for this thread to run
+	// after everything is set, push this thread into run queue and
+	// - make it ready for the execution.
 
-		// YOUR CODE HERE
-		if (callno == 0) // first time calling worker_create
+	// YOUR CODE HERE
+	if (callno == 0) // first time calling worker_create
+	{
+		if (worker_init() < 0) // TODO: handle errors
 		{
-			if (worker_init() < 0) // TODO: handle errors
-			{
-				perror("worker init error");
-				exit(1);
-			}
-		}
-
-		ucontext_t* cctx = malloc(sizeof(ucontext_t));
-		if (getcontext(cctx) < 0){
-			perror("getcontext");
+			perror("worker init error");
 			exit(1);
 		}
+	}
 
-		// Allocate space for stack
-		void *stack=malloc(STACK_SIZE);
-		
-		if (stack == NULL){
-			perror("Failed to allocate stack");
-			exit(1);
-		}
-		
-		/* Setup context that we are going to use */
-		cctx->uc_link=&main_ctx;
-		cctx->uc_stack.ss_sp=stack;
-		cctx->uc_stack.ss_size=STACK_SIZE;
-		cctx->uc_stack.ss_flags=0;
-		
-		// puts(" about to call make  context");
-		
-		makecontext(cctx, (void *)function, 1, (void *) arg);
+	ucontext_t *cctx = malloc(sizeof(ucontext_t));
+	if (getcontext(cctx) < 0)
+	{
+		perror("getcontext");
+		exit(1);
+	}
 
-		//create Thread Context Block
-		tcb* block = malloc(sizeof(tcb));
-		// create id for thread
-		*thread = callno;
-		block->id = thread;
-		block->context = cctx;
-		block->status = READY;
+	// Allocate space for stack
+	void *stack = malloc(STACK_SIZE);
 
-		// push thread to run queue
-		queue_add(&runqueue, block);
+	if (stack == NULL)
+	{
+		perror("Failed to allocate stack");
+		exit(1);
+	}
 
-		// run schedule context
-		callno = callno + 1;
-	
-		return 0;
+	/* Setup context that we are going to use */
+	cctx->uc_link = &main_ctx;
+	cctx->uc_stack.ss_sp = stack;
+	cctx->uc_stack.ss_size = STACK_SIZE;
+	cctx->uc_stack.ss_flags = 0;
+
+	// puts(" about to call make  context");
+
+	makecontext(cctx, (void *)function, 1, (void *)arg);
+
+	// create Thread Context Block
+	tcb *block = malloc(sizeof(tcb));
+	// create id for thread
+	*thread = callno;
+	block->id = thread;
+	block->context = cctx;
+	block->status = READY;
+
+	// push thread to run queue
+	queue_add(&runqueue, block);
+
+	// run schedule context
+	callno = callno + 1;
+
+	return 0;
 };
 
 /* give CPU possession to other user-level worker threads voluntarily */
-int worker_yield() {
-	
+int worker_yield()
+{
+
 	// - change worker thread's state from Running to Ready
 	// - save context of this thread to its thread control block
 	// - switch from thread context to scheduler context
 
 	// YOUR CODE HERE
-	ucontext_t* current = malloc(sizeof(ucontext_t));
-	if (getcontext(current) < 0){
+	ucontext_t *current = malloc(sizeof(ucontext_t));
+	if (getcontext(current) < 0)
+	{
 		perror("context yield");
-		exit(1);	
+		exit(1);
 	}
 
-	node* n = queue_front(&runqueue);
+	node *n = queue_front(&runqueue);
 	// free old context
 	free(n->t_block->context);
 	n->t_block->context = current;
@@ -250,40 +263,44 @@ int worker_yield() {
 	queue_pop(&runqueue);
 
 	printf(GREEN "thread #%d yielding...\n" RESET, *(n->t_block->id));
-	
-	swapcontext(current ,&sched_ctx);
+
+	swapcontext(current, &sched_ctx);
 	return 0;
 };
 
 /* terminate a thread */
-void worker_exit(void *value_ptr) {
+void worker_exit(void *value_ptr)
+{
 	// - de-allocate any dynamic memory created when starting this thread
-	
+
 	// set tcb to DONE -> ready for join()
-	node* n = queue_front(&runqueue);
+	node *n = queue_front(&runqueue);
 	n->t_block->status = DONE;
 
 	printf(GREEN "thread %d exited!\n" RESET, *(n->t_block->id));
 };
 
-
 /* Wait for thread termination */
-int worker_join(worker_t thread, void **value_ptr) {
-	
+int worker_join(worker_t thread, void **value_ptr)
+{
+
 	// - wait for a specific thread to terminate
 	// - de-allocate any dynamic memory created by the joining thread
-	// YOUR CODE HERE  
-	node* n = queue_front(&runqueue);
+	// YOUR CODE HERE
+	node *n = queue_front(&runqueue);
 	printf("waiting for thread %d\n", thread);
-	if (getcontext(&main_ctx) < 0){
+	if (getcontext(&main_ctx) < 0)
+	{
 		perror("get main_ctx");
 		exit(1);
 	}
-	while (*(n->t_block->id) != thread || (n->t_block->status != DONE)){
-		//DO NOTHING
+	while (*(n->t_block->id) != thread || (n->t_block->status != DONE))
+	{
+		// DO NOTHING
+		n = queue_front(&runqueue);
 	}
 
-	//TODO free ucontext, block, stack
+	// TODO free ucontext, block, stack
 	printf(GREEN "popping thread %d\n" RESET, *(n->t_block->id));
 	free(n->t_block->context->uc_stack.ss_sp);
 	free(n->t_block->context);
@@ -294,13 +311,13 @@ int worker_join(worker_t thread, void **value_ptr) {
 	if (is_empty(&runqueue))
 		puts("queue is emptied");
 
-
 	return 0;
 };
 
 /* initialize the mutex lock */
-int worker_mutex_init(worker_mutex_t *mutex, 
-                          const pthread_mutexattr_t *mutexattr) {
+int worker_mutex_init(worker_mutex_t *mutex,
+					  const pthread_mutexattr_t *mutexattr)
+{
 	//- initialize data structures for this mutex
 
 	// YOUR CODE HERE
@@ -311,7 +328,8 @@ int worker_mutex_init(worker_mutex_t *mutex,
 };
 
 /* aquire the mutex lock */
-int worker_mutex_lock(worker_mutex_t *mutex) {
+int worker_mutex_lock(worker_mutex_t *mutex)
+{
 
 	// - use the built-in test-and-set atomic function to test the mutex
 	// - if the mutex is acquired successfully, enter the critical section
@@ -319,16 +337,19 @@ int worker_mutex_lock(worker_mutex_t *mutex) {
 	// context switch to the scheduler thread
 
 	// YOUR CODE HERE
-	node* n = queue_front(&runqueue); 
-	tcb* block = n->t_block;
-	if (mutex->status == UNLOCKED){
+	node *n = queue_front(&runqueue);
+	tcb *block = n->t_block;
+	if (mutex->status == UNLOCKED)
+	{
 		mutex->status = LOCKED;
 		// record which thread is holding lock
 		mutex->thread_block = block;
-	} else{
+	}
+	else
+	{
 		queue_pop(&runqueue); // remove thread from runqueue
 
-		block_node* new_block_node = malloc(sizeof(block_node));
+		block_node *new_block_node = malloc(sizeof(block_node));
 		new_block_node->mutex = mutex;
 		new_block_node->current_thread = n;
 		new_block_node->current_thread->t_block->status = BLOCKED;
@@ -341,15 +362,18 @@ int worker_mutex_lock(worker_mutex_t *mutex) {
 };
 
 /* release the mutex lock */
-int worker_mutex_unlock(worker_mutex_t *mutex) {
-	// - release mutex and make it available again. 
-	// - put threads in block list to run queue 
+int worker_mutex_unlock(worker_mutex_t *mutex)
+{
+	// - release mutex and make it available again.
+	// - put threads in block list to run queue
 	// so that they could compete for mutex later.
 
-	if (mutex->status == LOCKED){
+	if (mutex->status == LOCKED)
+	{
 		mutex->status = UNLOCKED;
-		block_node* pop;
-		while(!list_empty(&blocklist) && ((pop = list_find(&blocklist, mutex)) != NULL)){
+		block_node *pop;
+		while (!list_empty(&blocklist) && ((pop = list_find(&blocklist, mutex)) != NULL))
+		{
 			// release blocked threads to runqueue again
 			pop->current_thread->t_block->status = READY;
 			queue_add(&runqueue, pop->current_thread->t_block);
@@ -361,27 +385,24 @@ int worker_mutex_unlock(worker_mutex_t *mutex) {
 	return 0;
 };
 
-
 /* destroy the mutex */
-int worker_mutex_destroy(worker_mutex_t *mutex) {
+int worker_mutex_destroy(worker_mutex_t *mutex)
+{
 	// - de-allocate dynamic memory created in worker_mutex_init
 
 	return 0;
 };
 
-
-
-//DO NOT MODIFY THIS FUNCTION
+// DO NOT MODIFY THIS FUNCTION
 /* Function to print global statistics. Do not modify this function.*/
-void print_app_stats(void) {
+void print_app_stats(void)
+{
 
-       fprintf(stderr, "Total context switches %ld \n", tot_cntx_switches);
-       fprintf(stderr, "Average turnaround time %lf \n", avg_turn_time);
-       fprintf(stderr, "Average response time  %lf \n", avg_resp_time);
+	fprintf(stderr, "Total context switches %ld \n", tot_cntx_switches);
+	fprintf(stderr, "Average turnaround time %lf \n", avg_turn_time);
+	fprintf(stderr, "Average response time  %lf \n", avg_resp_time);
 }
-
 
 // Feel free to add any other functions you need
 
 // YOUR CODE HERE
-

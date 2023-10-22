@@ -8,22 +8,29 @@
 
 #define STACK_SIZE SIGSTKSZ
 ucontext_t fctx, bctx;
+static volatile sig_atomic_t switch_context = 0;
 
 void foo(){
     while(1){
         printf("foo\n");
-        swapcontext(&fctx, &bctx);
+		switch_context = 1;
     }
 }
 
 void bar(){
     while(1){
         printf("bar\n");
-        swapcontext(&bctx, &fctx);
+		switch_context = 0;
     }
 }
 
-void switchContext()
+void scheduler(){
+    if (switch_context == 0) {
+        swapcontext(&bctx, &fctx);
+    } else if (switch_context == 1) {
+        swapcontext(&fctx, &bctx);
+    }
+}
 
 
 int main() {
@@ -45,29 +52,29 @@ int main() {
 	fctx.uc_stack.ss_size=STACK_SIZE;
 	fctx.uc_stack.ss_flags=0;
 
-    makecontext(&fctx, (void *)&foo, NULL);
+    makecontext(&fctx, (void *)&foo, 1, &bctx);
 
 
     void *bstack = malloc(STACK_SIZE);
 
-    if (bstack == NULL){
+	if (bstack == NULL){
 		perror("Failed to allocate stack");
 		exit(1);
 	}
 
     	/* Setup context that we are going to use */
 	bctx.uc_link=NULL;
-	bctx.uc_stack.ss_sp=fstack;
+	bctx.uc_stack.ss_sp=bstack;
 	bctx.uc_stack.ss_size=STACK_SIZE;
 	bctx.uc_stack.ss_flags=0;
 	
 
-    makecontext(&bctx, (void *)&bar, NULL);
+    makecontext(&bctx, (void *)&bar, 0, NULL);
 
 	// Use sigaction to register signal handler
     struct sigaction sa;
 	memset (&sa, 0, sizeof (sa));
-	sa.sa_handler = &ring;
+	sa.sa_handler = &scheduler;
 	sigaction (SIGPROF, &sa, NULL);
 
     // Create timer struct
@@ -86,11 +93,12 @@ int main() {
 
 	// Set the timer up (start the timer)
 	setitimer(ITIMER_PROF, &timer, NULL);
-	
-	// Kill some time
-	while(1);
+
+	//setcontext(&fctx);
+
+	while(1){
+
+	}
 
 	return 0;
-
-
 }
