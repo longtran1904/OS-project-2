@@ -17,6 +17,7 @@
 #define YELLOW "\033[0;33m"
 #define GREEN "\e[0;32m"
 #define RESET "\033[0m"
+#define QUANTUM 10
 
 // Global counter for total context switches and
 // average turn around and response time
@@ -30,7 +31,7 @@ static int callno = 0;
 static node *runqueue = NULL;
 static block_node *blocklist = NULL;
 static ucontext_t sched_ctx;
-static ucontext_t caller_sched; // context of caller
+static ucontext_t caller_sched; // context of caller that switched to scheduler aka last thread running before ring
 static ucontext_t main_ctx;
 static volatile sig_atomic_t switch_context = 0;
 
@@ -54,6 +55,8 @@ static void schedule()
 		// printf("Hello World from schedule context!!!\n");
 		if (!is_empty(&runqueue))
 		{
+
+			//LONG'S FCFS
 			// puts("queue not empty!!\n");
 			node *n = queue_front(&runqueue); // pop from queue - choose job to work
 			// deciphering to get and set context)
@@ -96,12 +99,57 @@ static void schedule()
 }
 
 /* Pre-emptive Shortest Job First (POLICY_PSJF) scheduling algorithm */
-static void sched_psjf()
-{
+static void sched_psjf(){
 	// - your own implementation of PSJF
 	// (feel free to modify arguments and return types)
-
+    
 	// YOUR CODE HERE
+	while (1 == 1){
+		printf("Hello World from psjf schedule context!!!\n");
+		if (!is_empty(&runqueue)){
+
+			puts("queue not empty!!\n");
+
+			move_lowest_quantum_tofront(&runqueue);
+			node *n = queue_front(&runqueue); // pop from queue - choose job to work
+			// deciphering to get and set context)
+			tcb *block = n->t_block;
+			if (block->status == READY)
+			{
+				if(block->rant == false){
+					block->rant == true;
+					struct timespec start_time;
+    				// Record the start time
+    				clock_gettime(CLOCK_MONOTONIC, &start_time);
+					block->time_response = start_time;
+				}
+				block->status = RUNNING;
+				printf("Executing thread %d\n", *(block->id));
+				block->quantum_counter = (block->quantum_counter) + 1;
+				setcontext(block->context);
+			}
+			else if (block->status == DONE)
+			{
+				queue_add(&runqueue, block);
+				queue_pop(&runqueue);
+				printf("thread %d is done! pushing it back...\n", *(block->id));
+			}
+			else if (block->status == RUNNING)
+			{
+				printf("thread is running... continue...\n");
+				setcontext(&caller_sched);
+			}
+
+			// printf("freeing heap from thread\n");
+			// free(block->context->uc_stack.ss_sp);
+		}
+		else
+		{
+			puts("queue is empty\n");
+			setcontext(&main_ctx);
+		}
+	}
+
 }
 
 /* Preemptive MLFQ scheduling algorithm */
@@ -212,7 +260,7 @@ int worker_create(worker_t *thread, pthread_attr_t *attr,
 	}
 
 	/* Setup context that we are going to use */
-	cctx->uc_link = &main_ctx;
+	cctx->uc_link = &main_ctx;   //after thread completes, link to main
 	cctx->uc_stack.ss_sp = stack;
 	cctx->uc_stack.ss_size = STACK_SIZE;
 	cctx->uc_stack.ss_flags = 0;
@@ -228,6 +276,15 @@ int worker_create(worker_t *thread, pthread_attr_t *attr,
 	block->id = thread;
 	block->context = cctx;
 	block->status = READY;
+
+	struct timespec arrival_time;
+	// Record the start time
+    clock_gettime(CLOCK_MONOTONIC, &arrival_time);
+	block->time_arrival = arrival_time;
+	block->quantum_counter = 0;
+	block->rant = false;
+
+	
 
 	// push thread to run queue
 	queue_add(&runqueue, block);
@@ -259,6 +316,7 @@ int worker_yield()
 	free(n->t_block->context);
 	n->t_block->context = current;
 	n->t_block->status = READY;
+	n->t_block->quantum_counter = (n->t_block->quantum_counter)-1;    //if yield, we dont count quantum   
 	queue_add(&runqueue, n->t_block);
 	queue_pop(&runqueue);
 

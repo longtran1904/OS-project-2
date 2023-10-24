@@ -16,6 +16,7 @@
 #include <unistd.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
+#include <sys/time.h>  //for measuring elapsed quantum of threads
 #include <stdio.h>
 #include <stdlib.h>
 #include <ucontext.h>
@@ -45,9 +46,15 @@ typedef struct TCB {
 
 	// YOUR CODE HERE
 	int testno;
+	int quantum_counter;
+	struct timespec time_arrival;
+	struct timespec time_finish;
+	struct timespec time_response;
+	bool rant;
 	worker_t* id;
 	t_status status;
 	ucontext_t* context;
+
 } tcb; 
 
 /* mutex struct definition */
