@@ -197,6 +197,7 @@ static void sched_mlfq()
 static void ring(int signum)
 {
 	switch_context = 1;
+	tot_cntx_switches++;
 	printf(YELLOW "RING RING! The timer has gone off\n" RESET);
 
 	node *n = queue_front(&runqueue);
@@ -406,7 +407,7 @@ int worker_create(worker_t *thread, pthread_attr_t *attr,
 /* give CPU possession to other user-level worker threads voluntarily */
 int worker_yield()
 {
-
+    tot_cntx_switches++;
 	// - change worker thread's state from Running to Ready
 	// - save context of this thread to its thread control block
 	// - switch from thread context to scheduler context
