@@ -205,8 +205,13 @@ static void ring(int signum)
 
 		node *n = queue_front(&runqueue);
 		queue_pop(&runqueue);
+		// move stack to new context
+		current->uc_stack.ss_sp = n->t_block->context->uc_stack.ss_sp;
+		n->t_block->context->uc_stack.ss_size = STACK_SIZE;
+		n->t_block->context->uc_stack.ss_flags = 0;
 		// free old context
 		free(n->t_block->context);
+		// update new context
 		n->t_block->context = current;
 		n->t_block->status = READY;
 		n->t_block->quantum_counter++;
@@ -217,11 +222,18 @@ static void ring(int signum)
 			perror("context yield");
 			exit(1);
 		}
+
+		swapcontext(current, &sched_ctx);
 #else
 		ucontext_t *current = malloc(sizeof(ucontext_t));
 
 		node *n = queue_front(&runqueue);
 		queue_pop(&runqueue);
+		// move stack to new context
+		current->uc_stack.ss_sp = n->t_block->context->uc_stack.ss_sp;
+		n->t_block->context->uc_stack.ss_size = STACK_SIZE;
+		n->t_block->context->uc_stack.ss_flags = 0;
+		// free old context
 		free(n->t_block->context);
 		n->t_block->context = current;
 		n->t_block->status = READY;
@@ -238,10 +250,11 @@ static void ring(int signum)
 			perror("context yield");
 			exit(1);
 		}
+		swapcontext(current, &sched_ctx);
 #endif
 	}
-
-	swapcontext(&caller_sched, &sched_ctx);
+	else 
+		swapcontext(&caller_sched, &sched_ctx);
 }
 
 int worker_init()
@@ -398,19 +411,26 @@ int worker_yield()
 
 	// YOUR CODE HERE
 	ucontext_t *current = malloc(sizeof(ucontext_t));
-	if (getcontext(current) < 0)
-	{
-		perror("context yield");
-		exit(1);
-	}
 
 	node *n = queue_front(&runqueue);
 	queue_pop(&runqueue);
 	// free old context
 	free(n->t_block->context);
+	// move stack to new context
+	current->uc_stack.ss_sp = n->t_block->context->uc_stack.ss_sp;
+	n->t_block->context->uc_stack.ss_size = STACK_SIZE;
+	n->t_block->context->uc_stack.ss_flags = 0;
+
+	//update context
 	n->t_block->context = current;
 	n->t_block->status = READY;
 	n->t_block->quantum_counter++;
+
+	if (getcontext(current) < 0)
+	{
+		perror("context yield");
+		exit(1);
+	}
 
 #ifndef MLFQ
 	queue_add(&runqueue, n->t_block);
