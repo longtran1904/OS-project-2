@@ -79,14 +79,18 @@ static void sched_psjf()
 			
 			if (block->status == READY)
 			{
-				puts("queue not empty!!\n");
 				if (block->rant == false)
 				{
 					block->rant == true;
-					struct timespec start_time;
+					struct timespec response_time, diff;
 					// Record the start time
-					clock_gettime(CLOCK_MONOTONIC, &start_time);
-					block->time_response = start_time;
+					clock_gettime(CLOCK_MONOTONIC, &response_time);
+					block->time_response = response_time;
+					diff.tv_sec = response_time.tv_sec - block->time_arrival.tv_sec;
+                    diff.tv_nsec = response_time.tv_nsec - block->time_arrival.tv_nsec;
+					double elapsed_microseconds = (diff.tv_sec * 1000000) + (diff.tv_nsec / 1000);
+					total_resp_sum += elapsed_microseconds;
+
 				}
 				block->status = RUNNING;
 				printf("Executing thread %d\n", *(block->id));
@@ -167,6 +171,20 @@ static void sched_mlfq()
 		}
 		else
 		{
+			tcb *block = nextToRun->t_block;
+			if (block->rant == false)
+				{
+					block->rant == true;
+					struct timespec response_time, diff;
+					// Record the start time
+					clock_gettime(CLOCK_MONOTONIC, &response_time);
+					block->time_response = response_time;
+					diff.tv_sec = response_time.tv_sec - block->time_arrival.tv_sec;
+                    diff.tv_nsec = response_time.tv_nsec - block->time_arrival.tv_nsec;
+					double elapsed_microseconds = (diff.tv_sec * 1000000) + (diff.tv_nsec / 1000);
+					total_resp_sum += elapsed_microseconds;
+
+				}
 			add_front(&runqueue, nextToRun);
 			queue_pop(mlfq[nextToRun->t_block->priority]);
 			swapcontext(&sched_ctx, nextToRun->t_block->context);
