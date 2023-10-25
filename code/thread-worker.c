@@ -365,8 +365,6 @@ int worker_create(worker_t *thread, pthread_attr_t *attr,
 	callno = callno + 1;
 #endif
 
-	// run schedule context
-	callno = callno + 1;
 
 	return 0;
 };
