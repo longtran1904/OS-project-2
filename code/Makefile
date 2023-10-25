@@ -20,7 +20,7 @@ else
 endif
 
 test: thread-worker.c test.c
-	$(CC) -g $^ -o test
+	$(CC) -g -DPSJF $^ -o test
 
 clean:
 	rm -rf testfile *.o *.a

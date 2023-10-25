@@ -184,11 +184,6 @@ static void ring(int signum)
 	{
 #ifndef MLFQ
 		ucontext_t *current = malloc(sizeof(ucontext_t));
-		if (getcontext(current) < 0)
-		{
-			perror("context yield");
-			exit(1);
-		}
 
 		node *n = queue_front(&runqueue);
 		queue_pop(&runqueue);
@@ -198,13 +193,15 @@ static void ring(int signum)
 		n->t_block->status = READY;
 		n->t_block->quantum_counter++;
 		queue_add(&runqueue, n->t_block);
-#else
-		ucontext_t *current = malloc(sizeof(ucontext_t));
+
 		if (getcontext(current) < 0)
 		{
 			perror("context yield");
 			exit(1);
 		}
+#else
+		ucontext_t *current = malloc(sizeof(ucontext_t));
+
 		node *n = queue_front(&runqueue);
 		queue_pop(&runqueue);
 		free(n->t_block->context);
@@ -217,6 +214,12 @@ static void ring(int signum)
 			n->t_block->priority_quantum_counter = 0;
 		}
 		queue_add(&mlfq[n->t_block->priority], n->t_block);
+
+		if (getcontext(current) < 0)
+		{
+			perror("context yield");
+			exit(1);
+		}
 #endif
 	}
 

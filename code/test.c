@@ -25,11 +25,54 @@ void *PrintHello(void *threadid)
 {
    long tid;
    tid = (long)threadid;
+
    printf("Hello World! It's me, thread #%ld!\n", tid);
 
    worker_exit(NULL);
 }
 
+void *PrintHello1s(void *threadid)
+{
+	long tid;
+	tid = (long)threadid;
+
+	int sum = 0;
+	for (int i = 0; i < 500000000; i++)
+	{
+		sum++;
+	}
+	printf("Hello World! It's me, 1s thread #%ld! \n", tid);
+
+	worker_exit(NULL);
+}
+
+void *PrintHello4s(void *threadid) {
+	long tid;
+	tid = (long)threadid;
+
+	int sum = 0;
+	for (int i = 0; i < 2000000000; i++)
+	{
+		sum++;
+	}
+	printf("Hello World! It's me, 4s thread #%ld!\n", tid);
+
+	worker_exit(NULL);	
+}
+
+void *PrintHello10s(void *threadid) {
+	long tid;
+	tid = (long)threadid;
+
+	int sum = 0;
+	for (int i = 0; i < 5000000000; i++)
+	{
+		sum++;
+	}
+	printf("Hello World! It's me, 10s thread #%ld!\n", tid);
+
+	worker_exit(NULL);	
+}
 void *PrintHelloYield(void *threadid){
 	long tid;
 	tid = (long)threadid;
@@ -109,8 +152,9 @@ int main(int argc, char **argv) {
 	// stat = worker_join(thread2, NULL);
 	worker_mutex_t mutex;
 
-	stat = worker_create(&thread1, NULL, (void*) PrintHelloYield, (void*) 0);
-	stat = worker_create(&thread2, NULL, (void*) PrintHello, (void*) 1);
+	stat = worker_create(&thread1, NULL, (void*) PrintHello4s, (void*) 0);
+	stat = worker_create(&thread2, NULL, (void*) PrintHello10s, (void*) 1);
+	stat = worker_create(&thread3, NULL, (void*) PrintHello1s, (void*) 2);	
 	
 
 	stat = worker_join(thread1, NULL);
@@ -120,7 +164,11 @@ int main(int argc, char **argv) {
 	stat = worker_join(thread2, NULL);
 	if (stat == 0) {
 		// printf("bank account updated: %d\n", bank_account);
-	}	
+	}
+	stat = worker_join(thread3, NULL);
+	if (stat == 0) {
+		// printf("bank account updated: %d\n", bank_account);
+	}		
 
 	puts("finished\n");
 
