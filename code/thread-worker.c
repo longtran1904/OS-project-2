@@ -41,6 +41,8 @@ static ucontext_t caller_sched; // context of caller that switched to scheduler 
 static ucontext_t main_ctx;
 static volatile sig_atomic_t switch_context = 0;
 
+struct itimerval timer;
+
 // to calculate global statistics
 static double total_turn_sum;
 static double total_resp_sum;
@@ -286,7 +288,7 @@ int worker_init()
 
 	// Set up what the timer should reset to after the timer goes off
 	timer.it_interval.tv_usec = 0;
-	timer.it_interval.tv_sec = 1;
+	timer.it_interval.tv_sec = QUANTUM;
 
 	// Set up the current timer to go off in 1 second
 	// Note: if both of the following values are zero
