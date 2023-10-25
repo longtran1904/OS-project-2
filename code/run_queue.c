@@ -6,6 +6,8 @@ typedef struct node {
     struct node* next; 
 } node;
 
+
+//adds node to back of queue
 int queue_add(node** head, tcb* block) {
 
     if (*head == NULL) {
@@ -102,6 +104,37 @@ void add_front(node** head, node* new_node) {
 
     new_node->next = *head;
     *head = new_node;
+}
+
+// Function to move every node from h2 to the end of h1, sets the priorities of nodes in h2 to h1 priority
+void queue_moveNodes(node** h1, node** h2, int h1_priority) {
+    if (*h2 == NULL) {
+        return;  // Nothing to move from h2
+    }
+
+    //change priority of h2 nodes to h1
+    node* current = *h2;
+    while (current != NULL) {
+        current->t_block->priority = h1_priority;
+        current = current->next;
+    }
+
+    // If h1 is empty, update its head to point to the nodes in h2
+    if (*h1 == NULL) {
+        *h1 = *h2;
+    } else {
+        // Find the last node in h1
+        node* lastNode = *h1;
+        while (lastNode->next != NULL) {
+            lastNode = lastNode->next;
+        }
+        
+        // Connect the last node in h1 to the head of h2
+        lastNode->next = *h2;
+    }
+
+    // Clear h2 by setting its head to NULL
+    *h2 = NULL;
 }
 
 

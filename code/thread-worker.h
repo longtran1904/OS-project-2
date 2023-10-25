@@ -19,6 +19,7 @@
 #include <sys/time.h>  //for measuring elapsed quantum of threads
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <ucontext.h>
 
 typedef uint worker_t;
@@ -51,6 +52,7 @@ typedef struct TCB {
 	struct timespec time_finish;
 	struct timespec time_response;
 	bool rant;
+	int priority;   // 0 is highest, 3 is lowest
 	worker_t* id;
 	t_status status;
 	ucontext_t* context;

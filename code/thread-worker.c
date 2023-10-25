@@ -29,11 +29,19 @@ double avg_resp_time = 0;
 // YOUR CODE HERE
 static int callno = 0;
 static node *runqueue = NULL;
+static node *mlfq[4];
+static int S;  // to reset priorities for mlfq
+static int mlfq_counter; // to compare to S ^
 static block_node *blocklist = NULL;
 static ucontext_t sched_ctx;
 static ucontext_t caller_sched; // context of caller that switched to scheduler aka last thread running before ring
 static ucontext_t main_ctx;
 static volatile sig_atomic_t switch_context = 0;
+
+//to calculate global statistics
+static double total_turn_sum;
+static double total_resp_sum;
+static int total_worker_threads;
 
 /* scheduler */
 static void schedule()
@@ -44,57 +52,60 @@ static void schedule()
 
 	// - invoke scheduling algorithms according to the policy (PSJF or MLFQ)
 
-	// if (sched == PSJF)
-	//		sched_psjf();
+	// if (sched == PSJF){
+	// 		sched_psjf();
+	// } 
 	// else if (sched == MLFQ)
 	// 		sched_mlfq();
+    
+	// // YOUR CODE HERE
+	// while (1 == 1)
+	// {
+	// 	// printf("Hello World from schedule context!!!\n");
+	// 	if (!is_empty(&runqueue))
+	// 	{
 
-	// YOUR CODE HERE
-	while (1 == 1)
-	{
-		// printf("Hello World from schedule context!!!\n");
-		if (!is_empty(&runqueue))
-		{
+	// 		//LONG'S FCFS
+	// 		// puts("queue not empty!!\n");
+	// 		node *n = queue_front(&runqueue); // pop from queue - choose job to work
+	// 		// deciphering to get and set context)
+	// 		tcb *block = n->t_block;
+	// 		if (block->status == READY)
+	// 		{
+	// 			block->status = RUNNING;
+	// 			printf("Executing thread %d\n", *(block->id));
+	// 			setcontext(block->context);
+	// 		}
+	// 		else if (block->status == DONE)
+	// 		{
+	// 			queue_add(&runqueue, block);
+	// 			queue_pop(&runqueue);
+	// 			printf("thread %d is done! pushing it back...\n", *(block->id));
+	// 		}
+	// 		else if (block->status == RUNNING)
+	// 		{
+	// 			printf("thread is running... continue...\n");
+	// 			setcontext(&caller_sched);
+	// 		}
 
-			//LONG'S FCFS
-			// puts("queue not empty!!\n");
-			node *n = queue_front(&runqueue); // pop from queue - choose job to work
-			// deciphering to get and set context)
-			tcb *block = n->t_block;
-			if (block->status == READY)
-			{
-				block->status = RUNNING;
-				printf("Executing thread %d\n", *(block->id));
-				setcontext(block->context);
-			}
-			else if (block->status == DONE)
-			{
-				queue_add(&runqueue, block);
-				queue_pop(&runqueue);
-				printf("thread %d is done! pushing it back...\n", *(block->id));
-			}
-			else if (block->status == RUNNING)
-			{
-				printf("thread is running... continue...\n");
-				setcontext(&caller_sched);
-			}
-
-			// printf("freeing heap from thread\n");
-			// free(block->context->uc_stack.ss_sp);
-		}
-		else
-		{
-			puts("queue is empty\n");
-			setcontext(&main_ctx);
-		}
-		// printf("scheduler action: %d\n", i++);
-	}
+	// 		// printf("freeing heap from thread\n");
+	// 		// free(block->context->uc_stack.ss_sp);
+	// 	}
+	// 	else
+	// 	{
+	// 		puts("queue is empty\n");
+	// 		setcontext(&main_ctx);
+	// 	}
+	// 	// printf("scheduler action: %d\n", i++);
+	// }
 
 // - schedule policy
 #ifndef MLFQ
 	// Choose PSJF
+	sched_psjf();
 #else
 	// Choose MLFQ
+	sched_mlfq();
 #endif
 }
 
@@ -153,12 +164,51 @@ static void sched_psjf(){
 }
 
 /* Preemptive MLFQ scheduling algorithm */
+// Rule 1: If Priority(A) > Priority(B), A runs (B doesn’t).
+// Rule 2: If Priority(A) = Priority(B), A & B run in RR
+//Rule 3: When a job enters the system, it is placed at the highest
+// priority (the topmost queue).
+// • Rule 4a: If a job uses up its allotment while running, its priority is
+// reduced (i.e., it moves down one queue).
+// • Rule 4b: If a job gives up the CPU (for example, by performing
+// an I/O operation) before the allotment is up, it stays at the same
+// priority level (i.e., its allotment is reset)
+// Rule 5: After some time period S, move all the jobs in the system
+// to the topmost queue
+
+// MODIFIED Rule 4: Once a job uses up its time allotment at a given level (regardless of how many times it has given up the CPU), its priority is
+// reduced (i.e., it moves down one queue).
 static void sched_mlfq()
 {
 	// - your own implementation of MLFQ
 	// (feel free to modify arguments and return types)
 
 	// YOUR CODE HERE
+	while(1){
+        if (mlfq_counter == S){    // resets priorities
+            queue_moveNodes(&mlfq[0], &mlfq[1], 0);
+			queue_moveNodes(&mlfq[0], &mlfq[2], 0);
+			queue_moveNodes(&mlfq[0], &mlfq[3], 0);
+			mlfq_counter = 0;
+		}
+		node* nextToRun = NULL;
+		for (int i = 0; i<4 && nextToRun == NULL; i++){
+			nextToRun = queue_front(&mlfq[i]);
+			if (nextToRun != NULL){
+				tcb *block = nextToRun->t_block;
+				if(block->status != READY){
+					queue_add(&mlfq[i], block);
+				    queue_pop(&mlfq[i]);
+					nextToRun == NULL;
+				}
+			}
+		}
+		if (nextToRun == NULL){
+			printf("MLFQ has nothing to run...\n");
+		} else {
+			swapcontext(&sched_ctx, nextToRun->t_block->context);
+		}
+	}
 }
 
 static void ring(int signum)
@@ -172,6 +222,16 @@ static void ring(int signum)
 int worker_init()
 {
 	runqueue = NULL; // create scheduler queue
+
+	#ifdef MLFQ   //sets up mlfq array with 4 queues
+	//with highest priority
+	    S = 5;
+		mlfq_counter = 0;
+		for (int i = 0; i < 4; i++) {
+			node *head = NULL;
+        	mlfq[i] = head;  // Initialize to NULL or create the queues/nodes as needed
+        }
+	#endif
 
 	// create timer signal handler
 	struct sigaction sa;
@@ -283,11 +343,17 @@ int worker_create(worker_t *thread, pthread_attr_t *attr,
 	block->time_arrival = arrival_time;
 	block->quantum_counter = 0;
 	block->rant = false;
+	block->priority = 0;
 
 	
 
 	// push thread to run queue
-	queue_add(&runqueue, block);
+	#ifndef MLFQ  //then PSJF
+		queue_add(&runqueue, block);
+	#else     //MLFQ
+		queue_add(&mlfq[0], block);
+		#endif
+	
 
 	// run schedule context
 	callno = callno + 1;
@@ -335,6 +401,10 @@ void worker_exit(void *value_ptr)
 	node *n = queue_front(&runqueue);
 	n->t_block->status = DONE;
 
+	#ifdef MLFQ
+	    
+	#endif
+
 	printf(GREEN "thread %d exited!\n" RESET, *(n->t_block->id));
 };
 
@@ -367,7 +437,7 @@ int worker_join(worker_t thread, void **value_ptr)
 	queue_pop(&runqueue);
 
 	if (is_empty(&runqueue))
-		puts("queue is emptied");
+		puts("runqueue is emptied");
 
 	return 0;
 };
