@@ -17,7 +17,7 @@
 #define YELLOW "\033[0;33m"
 #define GREEN "\e[0;32m"
 #define RESET "\033[0m"
-#define QUANTUM 10
+#define QUANTUM 20
 
 static void sched_psjf();
 static void sched_mlfq();

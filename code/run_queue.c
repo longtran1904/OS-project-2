@@ -113,7 +113,6 @@ void queue_moveNodes(node** h1, node** h2, int h1_priority) {
 void move_lowest_quantum_to_front(node** head) {
     if (is_empty(head)) {
         // Runqueue is empty, nothing to do
-        puts("one time!!\n");
         return;
     }
 
