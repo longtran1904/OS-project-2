@@ -371,6 +371,8 @@ int worker_create(worker_t *thread, pthread_attr_t *attr,
 	block->rant = false;
 	block->priority = 0;
 
+	total_worker_threads++;
+
 // push thread to run queue
 #ifndef MLFQ // then PSJF
 	queue_add(&runqueue, block);
@@ -438,7 +440,17 @@ void worker_exit(void *value_ptr)
 
 	// set tcb to DONE -> ready for join()
 	node *n = queue_front(&runqueue);
+	tcb *block = n->t_block;
 	n->t_block->status = DONE;
+	struct timespec finish_time, diff;
+	clock_gettime(CLOCK_MONOTONIC, &finish_time);
+    block->time_finish = finish_time;
+    diff.tv_sec = finish_time.tv_sec - block->time_response.tv_sec;
+	diff.tv_nsec = finish_time.tv_nsec - block->time_response.tv_nsec;
+	double elapsed_microseconds = (diff.tv_sec * 1000000) + (diff.tv_nsec / 1000);
+	total_turn_sum += elapsed_microseconds;
+
+
 
 #ifdef MLFQ
 
