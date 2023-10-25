@@ -55,7 +55,6 @@ void remove_node(node** head, node* node_to_remove) {
     if (*head == node_to_remove) {
         // The node to remove is the head of the list
         *head = (*head)->next;
-        free(node_to_remove);
         return;
     }
 
@@ -66,7 +65,6 @@ void remove_node(node** head, node* node_to_remove) {
 
     if (current != NULL) {
         current->next = node_to_remove->next;
-        free(node_to_remove);
     }
 }
 

@@ -109,17 +109,17 @@ int main(int argc, char **argv) {
 	// stat = worker_join(thread2, NULL);
 	worker_mutex_t mutex;
 
-	stat = worker_create(&thread1, NULL, (void*) critical, (void*) &mutex);
-	stat = worker_create(&thread2, NULL, (void*) critical2, (void*) &mutex);
+	stat = worker_create(&thread1, NULL, (void*) PrintHelloYield, (void*) 0);
+	stat = worker_create(&thread2, NULL, (void*) PrintHello, (void*) 1);
 	
 
 	stat = worker_join(thread1, NULL);
 	if (stat == 0) {
-		printf("bank account updated: %d\n", bank_account);
+		// printf("bank account updated: %d\n", bank_account);
 	}	
 	stat = worker_join(thread2, NULL);
 	if (stat == 0) {
-		printf("bank account updated: %d\n", bank_account);
+		// printf("bank account updated: %d\n", bank_account);
 	}	
 
 	puts("finished\n");

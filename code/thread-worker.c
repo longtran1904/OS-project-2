@@ -76,10 +76,6 @@ static void sched_psjf()
 			node *n = queue_front(&runqueue); // pop from queue - choose job to work
 			// deciphering to get and set context)
 			tcb *block = n->t_block;
-
-
-		    puts("queue not empty!!\n");
-			
 			
 			if (block->status == READY)
 			{
