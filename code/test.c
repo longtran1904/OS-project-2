@@ -65,7 +65,7 @@ void *PrintHello10s(void *threadid) {
 	tid = (long)threadid;
 
 	int sum = 0;
-	for (int i = 0; i < 5000000000; i++)
+	for (int i = 0; i < 2000000000; i++)
 	{
 		sum++;
 	}

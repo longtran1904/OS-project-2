@@ -90,6 +90,7 @@ static void sched_psjf()
                     diff.tv_nsec = response_time.tv_nsec - block->time_arrival.tv_nsec;
 					double elapsed_microseconds = (diff.tv_sec * 1000000) + (diff.tv_nsec / 1000);
 					total_resp_sum += elapsed_microseconds;
+					avg_resp_time = total_resp_sum/total_worker_threads;
 
 				}
 				block->status = RUNNING;
@@ -183,6 +184,7 @@ static void sched_mlfq()
                     diff.tv_nsec = response_time.tv_nsec - block->time_arrival.tv_nsec;
 					double elapsed_microseconds = (diff.tv_sec * 1000000) + (diff.tv_nsec / 1000);
 					total_resp_sum += elapsed_microseconds;
+					avg_resp_time = total_resp_sum/total_worker_threads;
 
 				}
 			add_front(&runqueue, nextToRun);
@@ -469,6 +471,7 @@ void worker_exit(void *value_ptr)
 	diff.tv_nsec = finish_time.tv_nsec - block->time_response.tv_nsec;
 	double elapsed_microseconds = (diff.tv_sec * 1000000) + (diff.tv_nsec / 1000);
 	total_turn_sum += elapsed_microseconds;
+	avg_turn_time = total_turn_sum/total_worker_threads;
 
 
 
