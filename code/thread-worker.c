@@ -29,8 +29,8 @@ double avg_resp_time = 0;
 // YOUR CODE HERE
 static int callno = 0;
 static node *runqueue = NULL;
-static node *mlfq[4];
-static int S;  // to reset priorities for mlfq
+static node **mlfq[4];
+static int S;			 // to reset priorities for mlfq
 static int mlfq_counter; // to compare to S ^
 static block_node *blocklist = NULL;
 static ucontext_t sched_ctx;
@@ -38,7 +38,7 @@ static ucontext_t caller_sched; // context of caller that switched to scheduler 
 static ucontext_t main_ctx;
 static volatile sig_atomic_t switch_context = 0;
 
-//to calculate global statistics
+// to calculate global statistics
 static double total_turn_sum;
 static double total_resp_sum;
 static int total_worker_threads;
@@ -54,10 +54,10 @@ static void schedule()
 
 	// if (sched == PSJF){
 	// 		sched_psjf();
-	// } 
+	// }
 	// else if (sched == MLFQ)
 	// 		sched_mlfq();
-    
+
 	// // YOUR CODE HERE
 	// while (1 == 1)
 	// {
@@ -110,14 +110,17 @@ static void schedule()
 }
 
 /* Pre-emptive Shortest Job First (POLICY_PSJF) scheduling algorithm */
-static void sched_psjf(){
+static void sched_psjf()
+{
 	// - your own implementation of PSJF
 	// (feel free to modify arguments and return types)
-    
+
 	// YOUR CODE HERE
-	while (1 == 1){
+	while (1 == 1)
+	{
 		printf("Hello World from psjf schedule context!!!\n");
-		if (!is_empty(&runqueue)){
+		if (!is_empty(&runqueue))
+		{
 
 			puts("queue not empty!!\n");
 
@@ -127,16 +130,16 @@ static void sched_psjf(){
 			tcb *block = n->t_block;
 			if (block->status == READY)
 			{
-				if(block->rant == false){
+				if (block->rant == false)
+				{
 					block->rant == true;
 					struct timespec start_time;
-    				// Record the start time
-    				clock_gettime(CLOCK_MONOTONIC, &start_time);
+					// Record the start time
+					clock_gettime(CLOCK_MONOTONIC, &start_time);
 					block->time_response = start_time;
 				}
 				block->status = RUNNING;
 				printf("Executing thread %d\n", *(block->id));
-				block->quantum_counter = (block->quantum_counter) + 1;
 				setcontext(block->context);
 			}
 			else if (block->status == DONE)
@@ -160,13 +163,12 @@ static void sched_psjf(){
 			setcontext(&main_ctx);
 		}
 	}
-
 }
 
 /* Preemptive MLFQ scheduling algorithm */
 // Rule 1: If Priority(A) > Priority(B), A runs (B doesn’t).
 // Rule 2: If Priority(A) = Priority(B), A & B run in RR
-//Rule 3: When a job enters the system, it is placed at the highest
+// Rule 3: When a job enters the system, it is placed at the highest
 // priority (the topmost queue).
 // • Rule 4a: If a job uses up its allotment while running, its priority is
 // reduced (i.e., it moves down one queue).
@@ -184,28 +186,38 @@ static void sched_mlfq()
 	// (feel free to modify arguments and return types)
 
 	// YOUR CODE HERE
-	while(1){
-        if (mlfq_counter == S){    // resets priorities
-            queue_moveNodes(&mlfq[0], &mlfq[1], 0);
+	while (1)
+	{
+		if (mlfq_counter == S)
+		{ // resets priorities
+			queue_moveNodes(&mlfq[0], &mlfq[1], 0);
 			queue_moveNodes(&mlfq[0], &mlfq[2], 0);
 			queue_moveNodes(&mlfq[0], &mlfq[3], 0);
 			mlfq_counter = 0;
 		}
-		node* nextToRun = NULL;
-		for (int i = 0; i<4 && nextToRun == NULL; i++){
+		node *nextToRun = NULL;
+		for (int i = 0; i < 4 && nextToRun == NULL; i++)
+		{
 			nextToRun = queue_front(&mlfq[i]);
-			if (nextToRun != NULL){
+			if (nextToRun != NULL)
+			{
 				tcb *block = nextToRun->t_block;
-				if(block->status != READY){
+				if (block->status != READY)
+				{
 					queue_add(&mlfq[i], block);
-				    queue_pop(&mlfq[i]);
+					queue_pop(&mlfq[i]);
 					nextToRun == NULL;
 				}
 			}
 		}
-		if (nextToRun == NULL){
+		if (nextToRun == NULL)
+		{
 			printf("MLFQ has nothing to run...\n");
-		} else {
+		}
+		else
+		{
+			add_front(&runqueue, mlfq[nextToRun->t_block->priority]);
+			queue_pop(&mlfq[nextToRun->t_block->priority]);
 			swapcontext(&sched_ctx, nextToRun->t_block->context);
 		}
 	}
@@ -216,6 +228,47 @@ static void ring(int signum)
 	switch_context = 1;
 	printf(YELLOW "RING RING! The timer has gone off\n" RESET);
 
+	node *n = queue_front(&runqueue);
+	if (n != NULL && n->t_block->status == RUNNING)
+	{
+#ifndef MLFQ
+		ucontext_t *current = malloc(sizeof(ucontext_t));
+		if (getcontext(current) < 0)
+		{
+			perror("context yield");
+			exit(1);
+		}
+
+		node *n = queue_front(&runqueue);
+		queue_pop(&runqueue);
+		// free old context
+		free(n->t_block->context);
+		n->t_block->context = current;
+		n->t_block->status = READY;
+		n->t_block->quantum_counter++;
+		queue_add(&runqueue, n->t_block);
+#else
+		ucontext_t *current = malloc(sizeof(ucontext_t));
+		if (getcontext(current) < 0)
+		{
+			perror("context yield");
+			exit(1);
+		}
+		node *n = queue_front(&runqueue);
+		queue_pop(&runqueue);
+		free(n->t_block->context);
+		n->t_block->context = current;
+		n->t_block->status = READY;
+		n->t_block->quantum_counter = n->t_block->quantum_counter++;
+		if (n->t_block->priority < 3)
+		{
+			n->t_block->priority = n->t_block->priority + 1;
+			n->t_block->priority_quantum_counter = 0;
+		}
+		queue_add(&mlfq[n->t_block->priority], n->t_block);
+#endif
+	}
+
 	swapcontext(&caller_sched, &sched_ctx);
 }
 
@@ -223,15 +276,16 @@ int worker_init()
 {
 	runqueue = NULL; // create scheduler queue
 
-	#ifdef MLFQ   //sets up mlfq array with 4 queues
-	//with highest priority
-	    S = 5;
-		mlfq_counter = 0;
-		for (int i = 0; i < 4; i++) {
-			node *head = NULL;
-        	mlfq[i] = head;  // Initialize to NULL or create the queues/nodes as needed
-        }
-	#endif
+#ifdef MLFQ // sets up mlfq array with 4 queues
+	// with highest priority
+	S = 5;
+	mlfq_counter = 0;
+	for (int i = 0; i < 4; i++)
+	{
+		node *head = NULL;
+		mlfq[i] = head; // Initialize to NULL or create the queues/nodes as needed
+	}
+#endif
 
 	// create timer signal handler
 	struct sigaction sa;
@@ -320,7 +374,7 @@ int worker_create(worker_t *thread, pthread_attr_t *attr,
 	}
 
 	/* Setup context that we are going to use */
-	cctx->uc_link = &main_ctx;   //after thread completes, link to main
+	cctx->uc_link = &main_ctx; // after thread completes, link to main
 	cctx->uc_stack.ss_sp = stack;
 	cctx->uc_stack.ss_size = STACK_SIZE;
 	cctx->uc_stack.ss_flags = 0;
@@ -339,21 +393,18 @@ int worker_create(worker_t *thread, pthread_attr_t *attr,
 
 	struct timespec arrival_time;
 	// Record the start time
-    clock_gettime(CLOCK_MONOTONIC, &arrival_time);
+	clock_gettime(CLOCK_MONOTONIC, &arrival_time);
 	block->time_arrival = arrival_time;
 	block->quantum_counter = 0;
 	block->rant = false;
 	block->priority = 0;
 
-	
-
-	// push thread to run queue
-	#ifndef MLFQ  //then PSJF
-		queue_add(&runqueue, block);
-	#else     //MLFQ
-		queue_add(&mlfq[0], block);
-		#endif
-	
+// push thread to run queue
+#ifndef MLFQ // then PSJF
+	queue_add(&runqueue, block);
+#else // MLFQ
+	queue_add(&mlfq[0], block);
+#endif
 
 	// run schedule context
 	callno = callno + 1;
@@ -378,13 +429,27 @@ int worker_yield()
 	}
 
 	node *n = queue_front(&runqueue);
+	queue_pop(&runqueue);
 	// free old context
 	free(n->t_block->context);
 	n->t_block->context = current;
 	n->t_block->status = READY;
-	n->t_block->quantum_counter = (n->t_block->quantum_counter)-1;    //if yield, we dont count quantum   
+	n->t_block->quantum_counter++;
+
+#ifndef MLFQ
 	queue_add(&runqueue, n->t_block);
-	queue_pop(&runqueue);
+#else
+	n->t_block->priority_quantum_counter++;
+	if (n->t_block->priority_quantum_counter > 5)
+	{
+		if (n->t_block->priority < 3)
+		{
+			n->t_block->priority++;
+			n->t_block->priority_quantum_counter = 0;
+		}
+	}
+	queue_add(&mlfq[n->t_block->priority], n->t_block);
+#endif
 
 	printf(GREEN "thread #%d yielding...\n" RESET, *(n->t_block->id));
 
@@ -401,9 +466,9 @@ void worker_exit(void *value_ptr)
 	node *n = queue_front(&runqueue);
 	n->t_block->status = DONE;
 
-	#ifdef MLFQ
-	    
-	#endif
+#ifdef MLFQ
+
+#endif
 
 	printf(GREEN "thread %d exited!\n" RESET, *(n->t_block->id));
 };

@@ -48,6 +48,7 @@ typedef struct TCB {
 	// YOUR CODE HERE
 	int testno;
 	int quantum_counter;
+	int priority_quantum_counter; //how many quantums a thread has been in 1 priority
 	struct timespec time_arrival;
 	struct timespec time_finish;
 	struct timespec time_response;
@@ -56,7 +57,6 @@ typedef struct TCB {
 	worker_t* id;
 	t_status status;
 	ucontext_t* context;
-
 } tcb; 
 
 /* mutex struct definition */
