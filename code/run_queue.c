@@ -121,9 +121,12 @@ void move_lowest_quantum_to_front(node** head) {
 
     // Find the node with the lowest quantum count and status "READY"
     while (current != NULL) {
-        if (current->t_block->quantum_counter < min_node->t_block->quantum_counter &&
-            current->t_block->status == READY) {
-            min_node = current;
+        if (current->t_block->status == READY){
+            if (min_node->t_block->status != READY){
+                min_node = current;
+            } else if (current->t_block->quantum_counter < min_node->t_block->quantum_counter){
+                    min_node = current;
+            }
         }
         current = current->next;
     }
