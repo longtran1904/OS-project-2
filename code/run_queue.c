@@ -138,5 +138,18 @@ void move_lowest_quantum_to_front(node** head) {
     add_front(head, min_node);
 }
 
+/*prints queue size*/
+int queue_size(node** head) {
+    int size = 0;
+    node* current = *head;
+
+    while (current != NULL) {
+        size++;
+        current = current->next;
+    }
+
+    return size;
+}
+
 
 

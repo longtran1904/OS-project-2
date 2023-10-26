@@ -191,7 +191,7 @@ You can modify and use this program as much as possible.
 This will not be graded.
 */
 
-pthread_t t1, t2;
+worker_t t1, t2;
 pthread_mutex_t mutex;
 int x = 0;
 
@@ -201,7 +201,7 @@ void add_counter(void* args){
     int i;
     //pthread_mutex_lock(&mutex);
 
-    for(i = 0; i < 100000000; i++){
+    for(i = 0; i < 1000000000; i++){
 
         pthread_mutex_lock(&mutex);
         x = x+1;

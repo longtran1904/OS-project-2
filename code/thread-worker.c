@@ -39,6 +39,8 @@ static block_node *blocklist = NULL;
 static ucontext_t sched_ctx;
 static ucontext_t caller_sched; // context of caller that switched to scheduler aka last thread running before ring
 static ucontext_t main_ctx;
+static tcb* main_tcb;
+static struct tcb_node* main_node; 
 static volatile sig_atomic_t switch_context = 0;
 
 struct sigaction sa;
@@ -107,7 +109,7 @@ static void sched_psjf()
 			{
 				if (block->rant == false)
 				{
-					block->rant == true;
+					block->rant = true;
 					struct timespec response_time, diff;
 					// Record the start time
 					clock_gettime(CLOCK_MONOTONIC, &response_time);
@@ -126,15 +128,16 @@ static void sched_psjf()
 			}
 			else if (block->status == DONE)
 			{
-				puts("queue not empty!!\n");
+				puts("queue still has done threads!!\n");
 				queue_add(&runqueue, block);
 				queue_pop(&runqueue);
 				resumeTimer;
 				printf("thread %d is done! pushing it back...\n", *(block->id));
+				setcontext(&main_ctx);
 			}
 			else if (block->status == RUNNING)
 			{
-				printf("thread is running... continue...\n");
+				printf("thread status is running in scheduler, nonono... continue...\n");
 				resumeTimer;
 				setcontext(&caller_sched);
 			}
@@ -206,7 +209,7 @@ static void sched_mlfq()
 			tcb *block = nextToRun->t_block;
 			if (block->rant == false)
 				{
-					block->rant == true;
+					block->rant = true;
 					struct timespec response_time, diff;
 					// Record the start time
 					clock_gettime(CLOCK_MONOTONIC, &response_time);
@@ -223,7 +226,7 @@ static void sched_mlfq()
 			add_front(&runqueue, nextToRun);
 			queue_pop(mlfq[nextToRun->t_block->priority]);
 			resumeTimer();
-			swapcontext(&sched_ctx, nextToRun->t_block->context);
+			setcontext(nextToRun->t_block->context);
 		}
 	}
 }
@@ -239,43 +242,45 @@ static void ring(int signum)
 	if ((n != NULL) && (n->t_block->status == RUNNING))
 	{
 #ifndef MLFQ
-		ucontext_t *current = malloc(sizeof(ucontext_t));
+		// ucontext_t *current = malloc(sizeof(ucontext_t));
 
 		node *n = queue_front(&runqueue);
 		queue_pop(&runqueue);
 		// move stack to new context
-		current->uc_stack.ss_sp = n->t_block->context->uc_stack.ss_sp;
-		n->t_block->context->uc_stack.ss_size = STACK_SIZE;
-		n->t_block->context->uc_stack.ss_flags = 0;
-		// free old context
-		free(n->t_block->context);
+		// current->uc_stack.ss_sp = n->t_block->context->uc_stack.ss_sp;
+		// n->t_block->context->uc_stack.ss_size = STACK_SIZE;
+		// n->t_block->context->uc_stack.ss_flags = 0;
+		// // free old context
+		// free(n->t_block->context);
 		// update new context
-		n->t_block->context = current;
+		// n->t_block->context = current;
 		n->t_block->status = READY;
 		n->t_block->quantum_counter++;
 		queue_add(&runqueue, n->t_block);
+
+		printf("Queue size after ring: %d\n", queue_size(&runqueue));
 		
 		resumeTimer();
 
-		if (getcontext(current) < 0)
-		{
-			perror("context yield");
-			exit(1);
-		}
+		// if (getcontext(current) < 0)
+		// {
+		// 	perror("context yield");
+		// 	exit(1);
+		// }
 
-		swapcontext(current, &sched_ctx);
+		swapcontext(&caller_sched, &sched_ctx);
 #else
-		ucontext_t *current = malloc(sizeof(ucontext_t));
+		// ucontext_t *current = malloc(sizeof(ucontext_t));
 
 		node *n = queue_front(&runqueue);
 		queue_pop(&runqueue);
 		// move stack to new context
-		current->uc_stack.ss_sp = n->t_block->context->uc_stack.ss_sp;
-		n->t_block->context->uc_stack.ss_size = STACK_SIZE;
-		n->t_block->context->uc_stack.ss_flags = 0;
+		// current->uc_stack.ss_sp = n->t_block->context->uc_stack.ss_sp;
+		// n->t_block->context->uc_stack.ss_size = STACK_SIZE;
+		// n->t_block->context->uc_stack.ss_flags = 0;
 		// free old context
-		free(n->t_block->context);
-		n->t_block->context = current;
+		// free(n->t_block->context);
+		// n->t_block->context = current;
 		n->t_block->status = READY;
 		n->t_block->quantum_counter = n->t_block->quantum_counter++;
 		if (n->t_block->priority < 3)
@@ -287,12 +292,12 @@ static void ring(int signum)
 
 		resumeTimer();
 
-		if (getcontext(current) < 0)
-		{
-			perror("context yield");
-			exit(1);
-		}
-		swapcontext(current, &sched_ctx);
+		// if (getcontext(current) < 0)
+		// {
+		// 	perror("context yield");
+		// 	exit(1);
+		// }
+		swapcontext(&caller_sched, &sched_ctx);
 #endif
 	}
 	else 
@@ -304,6 +309,12 @@ int worker_init()
 {
 	runqueue = NULL; // create scheduler queue
 	total_worker_threads = 0;
+
+	if (getcontext(&main_ctx) < 0)
+		{
+		perror("get main_ctx");
+		exit(1);
+	}
 
 #ifdef MLFQ // sets up mlfq array with 4 queues
 	// with highest priority
@@ -400,7 +411,7 @@ int worker_create(worker_t *thread, pthread_attr_t *attr,
 	}
 
 	/* Setup context that we are going to use */
-	cctx->uc_link = &main_ctx; // after thread completes, link to main
+	cctx->uc_link = &sched_ctx; // after thread completes, link to main
 	cctx->uc_stack.ss_sp = stack;
 	cctx->uc_stack.ss_size = STACK_SIZE;
 	cctx->uc_stack.ss_flags = 0;
@@ -425,7 +436,6 @@ int worker_create(worker_t *thread, pthread_attr_t *attr,
 	block->rant = false;
 	block->priority = 0;
 	block->num_thread = total_worker_threads;
-    puts(" finished from worker_exit");
 	total_worker_threads++;
 
 // push thread to run queue
@@ -439,7 +449,7 @@ int worker_create(worker_t *thread, pthread_attr_t *attr,
 	callno = callno + 1;
 #endif
 
-
+    swapcontext(&main_ctx, &sched_ctx);
 	return 0;
 };
 
@@ -503,15 +513,16 @@ void worker_exit(void *value_ptr)
 	// - de-allocate any dynamic memory created when starting this thread
 
 	// set tcb to DONE -> ready for join()
+	pauseTimer();
 	node *n = queue_front(&runqueue);
 	tcb *block = n->t_block;
 	block->status = DONE;
 	struct timespec finish_time, diff;
 	clock_gettime(CLOCK_MONOTONIC, &finish_time);
     block->time_finish = finish_time;
-	pauseTimer();
 	queue_add(&runqueue, block);
 	queue_pop(&runqueue);
+	printf("Queue size after worker_exit: %d\n", queue_size(&runqueue));
 	resumeTimer();
 	puts(" finished from worker_exit");
     diff.tv_sec = finish_time.tv_sec - block->time_response.tv_sec;
@@ -536,18 +547,33 @@ int worker_join(worker_t thread, void **value_ptr)
 	// - wait for a specific thread to terminate
 	// - de-allocate any dynamic memory created by the joining thread
 	// YOUR CODE HERE
+
+
+    printf("Trying to join mt q: %d\n", is_empty(&runqueue));
 	node *n = queue_front(&runqueue);
 	printf("waiting for thread %d\n", thread);
-	if (getcontext(&main_ctx) < 0)
-	{
-		perror("get main_ctx");
-		exit(1);
-	}
-	while (*(n->t_block->id) != thread || (n->t_block->status != DONE))
-	{
+	// if (getcontext(&main_ctx) < 0)
+	// {
+	// 	perror("get main_ctx");
+	// 	exit(1);
+	// }
+
+	while (1){
+		while (*(n->t_block->id) != thread)
+		{
 		// DO NOTHING
 		n = queue_front(&runqueue);
+		}
+		if (n->t_block->status != DONE){
+			swapcontext(&main_ctx,&sched_ctx);
+		}
 	}
+	
+	// while (*(n->t_block->id) != thread || (n->t_block->status != DONE))
+	// {
+	// 	// DO NOTHING
+	// 	n = queue_front(&runqueue);
+	// }
 
 	// TODO free ucontext, block, stack
 	printf(GREEN "popping thread %d\n" RESET, *(n->t_block->id));
@@ -557,7 +583,8 @@ int worker_join(worker_t thread, void **value_ptr)
 
     remove_node(&runqueue, n);
 	// queue_pop(&runqueue);
-
+ 
+    printf("Queue size after join (should be 1 lower): %d\n", queue_size(&runqueue));
 	if (is_empty(&runqueue))
 		puts("runqueue is emptied");
 
