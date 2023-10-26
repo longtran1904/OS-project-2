@@ -118,7 +118,7 @@ static void sched_psjf()
 		else
 		{
 			puts("queue is empty\n");
-			setcontext(&main_ctx);
+			// setcontext(&main_ctx);
 		}
 	}
 }
