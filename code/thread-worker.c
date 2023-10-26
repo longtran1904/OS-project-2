@@ -93,6 +93,7 @@ static void sched_psjf()
 	// YOUR CODE HERE
 	while (1 == 1)
 	{
+		pauseTimer();
 		printf("Hello World from psjf schedule context!!!\n");
 		if (!is_empty(&runqueue))
 		{
