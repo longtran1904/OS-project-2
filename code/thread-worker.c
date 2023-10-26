@@ -41,6 +41,9 @@ static ucontext_t caller_sched; // context of caller that switched to scheduler 
 static ucontext_t main_ctx;
 static volatile sig_atomic_t switch_context = 0;
 
+struct sigaction sa;
+struct itimerval timer;
+
 
 // to calculate global statistics
 static double total_turn_sum;
@@ -58,6 +61,27 @@ static void schedule()
 	// Choose MLFQ
 	sched_mlfq();
 #endif
+}
+
+void pauseTimer() {
+    // Set both timer values to zero to pause the timer
+    timer.it_interval.tv_usec = 0;
+    timer.it_interval.tv_sec = 0;
+    timer.it_value.tv_usec = 0;
+    timer.it_value.tv_sec = 0;
+
+    setitimer(ITIMER_PROF, &timer, NULL);
+}
+
+void resumeTimer() {
+
+    // Set both timer values to zero to pause the timer
+    timer.it_interval.tv_usec = QUANTUM;
+    timer.it_interval.tv_sec = 0;
+    timer.it_value.tv_usec = 5;
+    timer.it_value.tv_sec = 0;
+
+    setitimer(ITIMER_PROF, &timer, NULL);
 }
 
 /* Pre-emptive Shortest Job First (POLICY_PSJF) scheduling algorithm */
@@ -96,6 +120,7 @@ static void sched_psjf()
 				}
 				block->status = RUNNING;
 				printf("Executing thread %d\n", *(block->id));
+				resumeTimer();
 				setcontext(block->context);
 			}
 			else if (block->status == DONE)
@@ -103,11 +128,13 @@ static void sched_psjf()
 				puts("queue not empty!!\n");
 				queue_add(&runqueue, block);
 				queue_pop(&runqueue);
+				resumeTimer;
 				printf("thread %d is done! pushing it back...\n", *(block->id));
 			}
 			else if (block->status == RUNNING)
 			{
 				printf("thread is running... continue...\n");
+				resumeTimer;
 				setcontext(&caller_sched);
 			}
 
@@ -117,6 +144,7 @@ static void sched_psjf()
 		else
 		{
 			puts("queue is empty\n");
+			resumeTimer;
 			setcontext(&main_ctx);
 		}
 	}
@@ -169,6 +197,7 @@ static void sched_mlfq()
 		}
 		if (nextToRun == NULL)
 		{
+			resumeTimer();
 			printf("MLFQ has nothing to run...\n");
 		}
 		else
@@ -192,6 +221,7 @@ static void sched_mlfq()
 			// setitimer(ITIMER_PROF, &timer, NULL);
 			add_front(&runqueue, nextToRun);
 			queue_pop(mlfq[nextToRun->t_block->priority]);
+			resumeTimer();
 			swapcontext(&sched_ctx, nextToRun->t_block->context);
 		}
 	}
@@ -199,6 +229,7 @@ static void sched_mlfq()
 
 static void ring(int signum)
 {
+	pauseTimer();
 	switch_context = 1;
 	tot_cntx_switches++;
 	printf(YELLOW "RING RING! The timer has gone off\n" RESET);
@@ -222,6 +253,8 @@ static void ring(int signum)
 		n->t_block->status = READY;
 		n->t_block->quantum_counter++;
 		queue_add(&runqueue, n->t_block);
+		
+		resumeTimer();
 
 		if (getcontext(current) < 0)
 		{
@@ -251,6 +284,8 @@ static void ring(int signum)
 		}
 		queue_add(&mlfq[n->t_block->priority], n->t_block);
 
+		resumeTimer();
+
 		if (getcontext(current) < 0)
 		{
 			perror("context yield");
@@ -260,12 +295,14 @@ static void ring(int signum)
 #endif
 	}
 	else 
+	    resumeTimer();
 		swapcontext(&caller_sched, &sched_ctx);
 }
 
 int worker_init()
 {
 	runqueue = NULL; // create scheduler queue
+	total_worker_threads = 0;
 
 #ifdef MLFQ // sets up mlfq array with 4 queues
 	// with highest priority
@@ -279,13 +316,11 @@ int worker_init()
 #endif
 
 	// create timer signal handler
-	struct sigaction sa;
 	memset(&sa, 0, sizeof(sa));
 	sa.sa_handler = &ring; // call ring() whenever SIGPROF received
 	sigaction(SIGPROF, &sa, NULL);
 
 
-    struct itimerval timer;
 	// Set up what the timer should reset to after the timer goes off
 	timer.it_interval.tv_usec = QUANTUM;
 	timer.it_interval.tv_sec = 0;
@@ -388,7 +423,8 @@ int worker_create(worker_t *thread, pthread_attr_t *attr,
 	block->quantum_counter = 0;
 	block->rant = false;
 	block->priority = 0;
-
+	block->num_thread = total_worker_threads;
+    puts(" finished from worker_exit");
 	total_worker_threads++;
 
 // push thread to run queue
@@ -409,6 +445,7 @@ int worker_create(worker_t *thread, pthread_attr_t *attr,
 /* give CPU possession to other user-level worker threads voluntarily */
 int worker_yield()
 {
+	pauseTimer();
     tot_cntx_switches++;
 	// - change worker thread's state from Running to Ready
 	// - save context of this thread to its thread control block
@@ -454,6 +491,7 @@ int worker_yield()
 
 	printf(GREEN "thread #%d yielding...\n" RESET, *(n->t_block->id));
 
+    resumeTimer();
 	swapcontext(current, &sched_ctx);
 	return 0;
 };
@@ -466,10 +504,15 @@ void worker_exit(void *value_ptr)
 	// set tcb to DONE -> ready for join()
 	node *n = queue_front(&runqueue);
 	tcb *block = n->t_block;
-	n->t_block->status = DONE;
+	block->status = DONE;
 	struct timespec finish_time, diff;
 	clock_gettime(CLOCK_MONOTONIC, &finish_time);
     block->time_finish = finish_time;
+	pauseTimer();
+	queue_add(&runqueue, block);
+	queue_pop(&runqueue);
+	resumeTimer();
+	puts(" finished from worker_exit");
     diff.tv_sec = finish_time.tv_sec - block->time_response.tv_sec;
 	diff.tv_nsec = finish_time.tv_nsec - block->time_response.tv_nsec;
 	double elapsed_microseconds = (diff.tv_sec * 1000000) + (diff.tv_nsec / 1000);
@@ -511,7 +554,8 @@ int worker_join(worker_t thread, void **value_ptr)
 	free(n->t_block->context);
 	free(n->t_block);
 
-	queue_pop(&runqueue);
+    remove_node(&runqueue, n);
+	// queue_pop(&runqueue);
 
 	if (is_empty(&runqueue))
 		puts("runqueue is emptied");
@@ -572,7 +616,6 @@ int worker_mutex_unlock(worker_mutex_t *mutex)
 	// - release mutex and make it available again.
 	// - put threads in block list to run queue
 	// so that they could compete for mutex later.
-
 	if (mutex->status == LOCKED)
 	{
 		mutex->status = UNLOCKED;
@@ -585,7 +628,6 @@ int worker_mutex_unlock(worker_mutex_t *mutex)
 			free(pop);
 		}
 	}
-
 	// YOUR CODE HERE
 	return 0;
 };

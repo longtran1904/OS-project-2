@@ -47,6 +47,7 @@ typedef struct TCB {
 
 	// YOUR CODE HERE
 	int testno;
+	int num_thread;
 	int quantum_counter;
 	int priority_quantum_counter; //how many quantums a thread has been in 1 priority
 	struct timespec time_arrival;
@@ -74,6 +75,12 @@ typedef struct worker_mutex_t {
 
 
 /* Function Declarations: */
+
+/* pause the timer */
+void pauseTimer();
+
+/* pause the timer */
+void resumeTimer();
 
 /* create a new thread */
 int worker_create(worker_t * thread, pthread_attr_t * attr, void
