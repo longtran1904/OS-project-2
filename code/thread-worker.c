@@ -41,7 +41,6 @@ static ucontext_t caller_sched; // context of caller that switched to scheduler 
 static ucontext_t main_ctx;
 static volatile sig_atomic_t switch_context = 0;
 
-struct itimerval timer;
 
 // to calculate global statistics
 static double total_turn_sum;
@@ -189,8 +188,8 @@ static void sched_mlfq()
 					avg_resp_time = total_resp_sum/total_worker_threads;
 
 				}
-		    timer.it_interval.tv_usec = QUANTUM*(nextToRun->t_block->priority+1);
-			setitimer(ITIMER_PROF, &timer, NULL);
+		    // timer.it_interval.tv_usec = QUANTUM*(nextToRun->t_block->priority+1);
+			// setitimer(ITIMER_PROF, &timer, NULL);
 			add_front(&runqueue, nextToRun);
 			queue_pop(mlfq[nextToRun->t_block->priority]);
 			swapcontext(&sched_ctx, nextToRun->t_block->context);
@@ -285,6 +284,8 @@ int worker_init()
 	sa.sa_handler = &ring; // call ring() whenever SIGPROF received
 	sigaction(SIGPROF, &sa, NULL);
 
+
+    struct itimerval timer;
 	// Set up what the timer should reset to after the timer goes off
 	timer.it_interval.tv_usec = QUANTUM;
 	timer.it_interval.tv_sec = 0;
