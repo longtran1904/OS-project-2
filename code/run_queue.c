@@ -7,6 +7,35 @@ typedef struct node {
 } node;
 
 
+bool is_empty(node** head){
+    return (*head == NULL);
+}
+
+void queue_add_node(node** head, node* new_node){
+    new_node->next = NULL;
+    if (*head == NULL) {
+        *head = new_node;
+    }
+    else{
+        node* temp = *head;
+        while (temp->next != NULL) {  
+            temp = temp->next;
+        }
+        temp->next = new_node;
+    }
+    
+}
+
+void queue_pop_node(node** head){
+    if (*head == NULL) return;
+    *head = (*head)->next;
+}
+
+node* queue_front_node(node** head){
+    if (*head == NULL) return NULL;
+    return *head;
+}
+
 //adds node to back of queue
 int queue_add(node** head, tcb* block) {
 
@@ -30,20 +59,6 @@ int queue_add(node** head, tcb* block) {
     }
     return 0;
     
-}
-
-node* queue_front(node** head){
-    if (*head == NULL) return NULL;
-    return *head;
-}
-
-void queue_pop(node** head){
-    if (*head == NULL) return;
-    *head = (*head)->next;
-}
-
-bool is_empty(node** head){
-    return (*head == NULL);
 }
 
 void remove_node(node** head, node* node_to_remove) {
@@ -137,6 +152,3 @@ void move_lowest_quantum_to_front(node** head) {
     // Add the node with the lowest quantum count to the front of the runqueue
     add_front(head, min_node);
 }
-
-
-

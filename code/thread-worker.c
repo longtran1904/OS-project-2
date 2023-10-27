@@ -94,12 +94,12 @@ static void sched_psjf()
 	while (1 == 1)
 	{
 		pauseTimer();
-		printf("Hello World from psjf schedule context!!!\n");
+		// printf("Hello World from psjf schedule context!!!\n");
 		if (!is_empty(&runqueue))
 		{
 			move_lowest_quantum_to_front(&runqueue);
 
-			node *n = queue_front(&runqueue); // pop from queue - choose job to work
+			node *n = queue_front_node(&runqueue); // pop from queue - choose job to work
 			// deciphering to get and set context)
 			tcb *block = n->t_block;
 			
@@ -107,7 +107,7 @@ static void sched_psjf()
 			{
 				if (block->rant == false)
 				{
-					block->rant == true;
+					block->rant = true;
 					struct timespec response_time, diff;
 					// Record the start time
 					clock_gettime(CLOCK_MONOTONIC, &response_time);
@@ -120,25 +120,24 @@ static void sched_psjf()
 
 				}
 				block->status = RUNNING;
-				printf("Executing thread %d\n", *(block->id));
+				// printf("Executing thread %d\n", *(block->id));
 				resumeTimer();
 				setcontext(block->context);
 			}
 			else if (block->status == DONE)
 			{
 				puts("queue not empty!!\n");
-				queue_add(&runqueue, block);
-				queue_pop(&runqueue);
-				resumeTimer;
+				queue_add_node(&runqueue, n);
+				queue_pop_node(&runqueue);
+				resumeTimer();
 				printf("thread %d is done! pushing it back...\n", *(block->id));
 			}
 			else if (block->status == RUNNING)
 			{
-				printf("thread is running... continue...\n");
-				resumeTimer;
+				printf("thread %d is running... continue...\n", *(block->id));
+				resumeTimer();
 				setcontext(&caller_sched);
 			}
-
 			// printf("freeing heap from thread\n");
 			// free(block->context->uc_stack.ss_sp);
 		}
@@ -184,14 +183,14 @@ static void sched_mlfq()
 		node *nextToRun = NULL;
 		for (int i = 0; i < 4 && nextToRun == NULL; i++)
 		{
-			nextToRun = queue_front(mlfq[i]);
+			nextToRun = queue_front_node(mlfq[i]);
 			if (nextToRun != NULL)
 			{
 				tcb *block = nextToRun->t_block;
 				if (block->status != READY)
 				{
-					queue_add(mlfq[i], block);
-					queue_pop(mlfq[i]);
+					queue_add_node(mlfq[i], nextToRun);
+					queue_pop_node(mlfq[i]);
 					nextToRun == NULL;
 				}
 			}
@@ -221,7 +220,7 @@ static void sched_mlfq()
 		    // timer.it_interval.tv_usec = QUANTUM*(nextToRun->t_block->priority+1);
 			// setitimer(ITIMER_PROF, &timer, NULL);
 			add_front(&runqueue, nextToRun);
-			queue_pop(mlfq[nextToRun->t_block->priority]);
+			queue_pop_node(mlfq[nextToRun->t_block->priority]);
 			resumeTimer();
 			swapcontext(&sched_ctx, nextToRun->t_block->context);
 		}
@@ -233,49 +232,28 @@ static void ring(int signum)
 	pauseTimer();
 	switch_context = 1;
 	tot_cntx_switches++;
-	printf(YELLOW "RING RING! The timer has gone off\n" RESET);
+	// printf(YELLOW "RING RING! The timer has gone off\n" RESET);
+	node *n = queue_front_node(&runqueue);
 
-	node *n = queue_front(&runqueue);
 	if ((n != NULL) && (n->t_block->status == RUNNING))
 	{
 #ifndef MLFQ
-		ucontext_t *current = malloc(sizeof(ucontext_t));
+		
+		queue_pop_node(&runqueue);
 
-		node *n = queue_front(&runqueue);
-		queue_pop(&runqueue);
-		// move stack to new context
-		current->uc_stack.ss_sp = n->t_block->context->uc_stack.ss_sp;
-		n->t_block->context->uc_stack.ss_size = STACK_SIZE;
-		n->t_block->context->uc_stack.ss_flags = 0;
-		// free old context
-		free(n->t_block->context);
 		// update new context
-		n->t_block->context = current;
 		n->t_block->status = READY;
 		n->t_block->quantum_counter++;
-		queue_add(&runqueue, n->t_block);
+
+		queue_add_node(&runqueue, n);
 		
 		resumeTimer();
 
-		if (getcontext(current) < 0)
-		{
-			perror("context yield");
-			exit(1);
-		}
-
-		swapcontext(current, &sched_ctx);
+		swapcontext(n->t_block->context, &sched_ctx);
 #else
-		ucontext_t *current = malloc(sizeof(ucontext_t));
 
-		node *n = queue_front(&runqueue);
-		queue_pop(&runqueue);
-		// move stack to new context
-		current->uc_stack.ss_sp = n->t_block->context->uc_stack.ss_sp;
-		n->t_block->context->uc_stack.ss_size = STACK_SIZE;
-		n->t_block->context->uc_stack.ss_flags = 0;
-		// free old context
-		free(n->t_block->context);
-		n->t_block->context = current;
+		queue_pop_node(&runqueue);
+
 		n->t_block->status = READY;
 		n->t_block->quantum_counter = n->t_block->quantum_counter++;
 		if (n->t_block->priority < 3)
@@ -283,21 +261,18 @@ static void ring(int signum)
 			n->t_block->priority = n->t_block->priority + 1;
 			n->t_block->priority_quantum_counter = 0;
 		}
-		queue_add(&mlfq[n->t_block->priority], n->t_block);
+		queue_add_node(&mlfq[n->t_block->priority], n);
 
 		resumeTimer();
 
-		if (getcontext(current) < 0)
-		{
-			perror("context yield");
-			exit(1);
-		}
-		swapcontext(current, &sched_ctx);
+		swapcontext(n->t_block->context, &sched_ctx);
 #endif
 	}
-	else 
-	    resumeTimer();
+	else {
+		resumeTimer();
 		swapcontext(&caller_sched, &sched_ctx);
+	}
+	    
 }
 
 int worker_init()
@@ -425,7 +400,6 @@ int worker_create(worker_t *thread, pthread_attr_t *attr,
 	block->rant = false;
 	block->priority = 0;
 	block->num_thread = total_worker_threads;
-    puts(" finished from worker_exit");
 	total_worker_threads++;
 
 // push thread to run queue
@@ -453,30 +427,15 @@ int worker_yield()
 	// - switch from thread context to scheduler context
 
 	// YOUR CODE HERE
-	ucontext_t *current = malloc(sizeof(ucontext_t));
 
-	node *n = queue_front(&runqueue);
-	queue_pop(&runqueue);
-	// free old context
-	free(n->t_block->context);
-	// move stack to new context
-	current->uc_stack.ss_sp = n->t_block->context->uc_stack.ss_sp;
-	n->t_block->context->uc_stack.ss_size = STACK_SIZE;
-	n->t_block->context->uc_stack.ss_flags = 0;
+	node *n = queue_front_node(&runqueue);
+	queue_pop_node(&runqueue);
 
-	//update context
-	n->t_block->context = current;
 	n->t_block->status = READY;
 	n->t_block->quantum_counter++;
 
-	if (getcontext(current) < 0)
-	{
-		perror("context yield");
-		exit(1);
-	}
-
 #ifndef MLFQ
-	queue_add(&runqueue, n->t_block);
+	queue_add_node(&runqueue, n);
 #else
 	n->t_block->priority_quantum_counter++;
 	if (n->t_block->priority_quantum_counter > 5)
@@ -487,13 +446,13 @@ int worker_yield()
 			n->t_block->priority_quantum_counter = 0;
 		}
 	}
-	queue_add(&mlfq[n->t_block->priority], n->t_block);
+	queue_add_node(&mlfq[n->t_block->priority], n);
 #endif
 
 	printf(GREEN "thread #%d yielding...\n" RESET, *(n->t_block->id));
 
     resumeTimer();
-	swapcontext(current, &sched_ctx);
+	swapcontext(n->t_block->context, &sched_ctx);
 	return 0;
 };
 
@@ -503,19 +462,20 @@ void worker_exit(void *value_ptr)
 	// - de-allocate any dynamic memory created when starting this thread
 
 	// set tcb to DONE -> ready for join()
-	node *n = queue_front(&runqueue);
+	node *n = queue_front_node(&runqueue);
 	tcb *block = n->t_block;
 	block->status = DONE;
 	struct timespec finish_time, diff;
 	clock_gettime(CLOCK_MONOTONIC, &finish_time);
     block->time_finish = finish_time;
 	pauseTimer();
+	// printf(" finished from worker_exit thread %d\n", *(n->t_block->id));
+
 	queue_add(&runqueue, block);
-	queue_pop(&runqueue);
+	queue_pop_node(&runqueue);
 	resumeTimer();
-	puts(" finished from worker_exit");
-    diff.tv_sec = finish_time.tv_sec - block->time_response.tv_sec;
-	diff.tv_nsec = finish_time.tv_nsec - block->time_response.tv_nsec;
+    diff.tv_sec = finish_time.tv_sec - block->time_arrival.tv_sec;
+	diff.tv_nsec = finish_time.tv_nsec - block->time_arrival.tv_nsec;
 	double elapsed_microseconds = (diff.tv_sec * 1000000) + (diff.tv_nsec / 1000);
 	total_turn_sum += elapsed_microseconds;
 	avg_turn_time = total_turn_sum/total_worker_threads;
@@ -526,7 +486,7 @@ void worker_exit(void *value_ptr)
 
 #endif
 
-	printf(GREEN "thread %d exited!\n" RESET, *(n->t_block->id));
+	// printf(GREEN "thread %d exited!\n" RESET, *(n->t_block->id));
 };
 
 /* Wait for thread termination */
@@ -536,7 +496,7 @@ int worker_join(worker_t thread, void **value_ptr)
 	// - wait for a specific thread to terminate
 	// - de-allocate any dynamic memory created by the joining thread
 	// YOUR CODE HERE
-	node *n = queue_front(&runqueue);
+	node *n = queue_front_node(&runqueue);
 	printf("waiting for thread %d\n", thread);
 	if (getcontext(&main_ctx) < 0)
 	{
@@ -546,16 +506,18 @@ int worker_join(worker_t thread, void **value_ptr)
 	while (*(n->t_block->id) != thread || (n->t_block->status != DONE))
 	{
 		// DO NOTHING
-		n = queue_front(&runqueue);
+		n = queue_front_node(&runqueue);
 	}
 
 	// TODO free ucontext, block, stack
 	printf(GREEN "popping thread %d\n" RESET, *(n->t_block->id));
+
+	remove_node(&runqueue, n);
+
 	free(n->t_block->context->uc_stack.ss_sp);
 	free(n->t_block->context);
 	free(n->t_block);
-
-    remove_node(&runqueue, n);
+	free(n);
 	// queue_pop(&runqueue);
 
 	if (is_empty(&runqueue))
@@ -587,9 +549,9 @@ int worker_mutex_lock(worker_mutex_t *mutex)
 	// context switch to the scheduler thread
 
 	// YOUR CODE HERE
-	node *n = queue_front(&runqueue);
+	node *n = queue_front_node(&runqueue);
 	tcb *block = n->t_block;
-	if (mutex->status == UNLOCKED)
+	if (mutex->status == UNLOCKED || *(mutex->thread_block->id) == *(block->id))
 	{
 		mutex->status = LOCKED;
 		// record which thread is holding lock
@@ -597,7 +559,10 @@ int worker_mutex_lock(worker_mutex_t *mutex)
 	}
 	else
 	{
-		queue_pop(&runqueue); // remove thread from runqueue
+
+		// printf("LOCK OBTAINED BY THREAD %d!!!\n", *(mutex->thread_block->id));
+
+		queue_pop_node(&runqueue); // remove thread from runqueue
 
 		block_node *new_block_node = malloc(sizeof(block_node));
 		new_block_node->mutex = mutex;
@@ -605,7 +570,7 @@ int worker_mutex_lock(worker_mutex_t *mutex)
 		new_block_node->current_thread->t_block->status = BLOCKED;
 		new_block_node->next = NULL;
 		list_add(&blocklist, new_block_node); // record whole thread node on queue
-		setcontext(&sched_ctx);
+		swapcontext(n->t_block->context, &sched_ctx);
 	}
 
 	return 0;
@@ -625,7 +590,7 @@ int worker_mutex_unlock(worker_mutex_t *mutex)
 		{
 			// release blocked threads to runqueue again
 			pop->current_thread->t_block->status = READY;
-			queue_add(&runqueue, pop->current_thread->t_block);
+			queue_add_node(&runqueue, pop->current_thread);
 			free(pop);
 		}
 	}
@@ -637,7 +602,7 @@ int worker_mutex_unlock(worker_mutex_t *mutex)
 int worker_mutex_destroy(worker_mutex_t *mutex)
 {
 	// - de-allocate dynamic memory created in worker_mutex_init
-
+	// free(mutex);
 	return 0;
 };
 

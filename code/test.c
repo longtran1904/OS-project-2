@@ -180,7 +180,6 @@
 #include <unistd.h>
 #include <pthread.h>
 #include "thread-worker.h"
-#include "thread-worker.c"
 #include <stdlib.h>
 /* A scratch program template on which to call and
  
@@ -193,7 +192,7 @@ This will not be graded.
 
 pthread_t t1, t2;
 pthread_mutex_t mutex;
-int x = 0;
+long x = 0;
 
 
 void add_counter(void* args){
@@ -201,12 +200,13 @@ void add_counter(void* args){
     int i;
     //pthread_mutex_lock(&mutex);
 
-    for(i = 0; i < 100000000; i++){
+    // for(i = 0; i < 50000000; i++){
+    for (i = 0; i < 50000000; i++){
 
-        pthread_mutex_lock(&mutex);
+        worker_mutex_lock(&mutex);
         x = x+1;
-        pthread_mutex_unlock(&mutex);
-        
+        worker_mutex_unlock(&mutex);
+
     }
 	//pthread_mutex_unlock(&mutex);
     pthread_exit(NULL);
@@ -219,18 +219,18 @@ int main(int argc, char *argv) {
     pthread_mutex_init(&mutex, NULL);
 
     // Implement HERE */
-    printf("starting main...");
+    // printf("starting main...\n");
     worker_create(&t1, NULL, (void*) add_counter, NULL);
     worker_create(&t2, NULL, (void*) add_counter, NULL);
-    printf("\nfinished creating threads...");
+    // printf("finished creating threads...\n");
     pthread_join(t1, NULL);
-    printf("\nworker join 2");
+    // printf("worker join 2\n");
     // worker_yield();
     pthread_join(t2, NULL);
-    printf("joined threads");
+    // printf("joined threads");
     print_app_stats();
 
-    printf("\nX = %d\n", x);
+    printf("\nX = %ld\n", x);
     pthread_mutex_destroy(&mutex);
 
 
