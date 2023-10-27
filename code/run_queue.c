@@ -12,6 +12,7 @@ bool is_empty(node** head){
 }
 
 void queue_add_node(node** head, node* new_node){
+    printf("adding thread %d to queue!!\n", *(new_node->t_block->id));
     new_node->next = NULL;
     if (*head == NULL) {
         *head = new_node;
@@ -22,11 +23,11 @@ void queue_add_node(node** head, node* new_node){
             temp = temp->next;
         }
         temp->next = new_node;
-    }
-    
+    }   
 }
 
 void queue_pop_node(node** head){
+    printf("poping thread %d from the queue\n", *((*head)->t_block->id));
     if (*head == NULL) return;
     *head = (*head)->next;
 }

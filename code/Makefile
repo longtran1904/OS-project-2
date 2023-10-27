@@ -9,7 +9,7 @@ thread-worker.a: thread-worker.o
 	$(AR) libthread-worker.a thread-worker.o
 	$(RANLIB) libthread-worker.a
 
-thread-worker.o: thread-worker.h
+thread-worker.o: thread-worker.h run_queue.o block_list.o
 
 ifeq ($(SCHED), PSJF)
 	$(CC) -pthread $(CFLAGS) -DPSJF thread-worker.c
@@ -18,6 +18,12 @@ else ifeq ($(SCHED), MLFQ)
 else
 	echo "no such scheduling algorithm"
 endif
+
+run_queue.o: 
+	$(CC) $(CFLAGS) run_queue.c
+
+block_list.o:
+	$(CC) $(CFLAGS) block_list.c
 
 test: thread-worker.c test.c
 	$(CC) -g -DPSJF $^ -o test

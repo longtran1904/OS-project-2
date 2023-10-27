@@ -5,19 +5,19 @@
 // iLab Server:
 
 #include "thread-worker.h"
-#include "run_queue.c"
-#include "block_list.c"
 #include <signal.h>
 #include <time.h>
 #include <string.h>
 #include <sys/time.h>
+#include "run_queue.c"
+#include "block_list.c"
 
 #define STACK_SIZE SIGSTKSZ
 
 #define YELLOW "\033[0;33m"
 #define GREEN "\e[0;32m"
 #define RESET "\033[0m"
-#define QUANTUM 1000
+#define QUANTUM 10
 
 static void sched_psjf();
 static void sched_mlfq();
@@ -43,6 +43,8 @@ static volatile sig_atomic_t switch_context = 0;
 
 struct sigaction sa;
 struct itimerval timer;
+struct itimerval save_timer;
+struct itimerval pause_timer;
 
 
 // to calculate global statistics
@@ -65,22 +67,19 @@ static void schedule()
 
 void pauseTimer() {
     // Set both timer values to zero to pause the timer
-    timer.it_interval.tv_usec = 0;
-    timer.it_interval.tv_sec = 0;
-    timer.it_value.tv_usec = 0;
-    timer.it_value.tv_sec = 0;
-
-    setitimer(ITIMER_PROF, &timer, NULL);
+    setitimer(ITIMER_PROF, &pause_timer, NULL);
 }
 
 void resumeTimer() {
 
     // Set both timer values to zero to pause the timer
+
     timer.it_interval.tv_usec = QUANTUM;
     timer.it_interval.tv_sec = 0;
     timer.it_value.tv_usec = 5;
     timer.it_value.tv_sec = 0;
-
+	// timer = save_timer;
+	// timer = save_timer;
     setitimer(ITIMER_PROF, &timer, NULL);
 }
 
@@ -130,7 +129,7 @@ static void sched_psjf()
 				queue_add_node(&runqueue, n);
 				queue_pop_node(&runqueue);
 				resumeTimer();
-				printf("thread %d is done! pushing it back...\n", *(block->id));
+				// printf("thread %d is done! pushing it back...\n", *(block->id));
 			}
 			else if (block->status == RUNNING)
 			{
@@ -144,7 +143,7 @@ static void sched_psjf()
 		else
 		{
 			puts("queue is empty\n");
-			resumeTimer;
+			resumeTimer();
 			setcontext(&main_ctx);
 		}
 	}
@@ -232,7 +231,7 @@ static void ring(int signum)
 	pauseTimer();
 	switch_context = 1;
 	tot_cntx_switches++;
-	// printf(YELLOW "RING RING! The timer has gone off\n" RESET);
+	printf(YELLOW "RING RING! The timer has gone off\n" RESET);
 	node *n = queue_front_node(&runqueue);
 
 	if ((n != NULL) && (n->t_block->status == RUNNING))
@@ -296,6 +295,11 @@ int worker_init()
 	sa.sa_handler = &ring; // call ring() whenever SIGPROF received
 	sigaction(SIGPROF, &sa, NULL);
 
+	// initialize pause_time
+	pause_timer.it_interval.tv_usec = 0;
+	pause_timer.it_interval.tv_sec = 0;
+	pause_timer.it_value.tv_usec = 0;
+	pause_timer.it_value.tv_sec = 0;
 
 	// Set up what the timer should reset to after the timer goes off
 	timer.it_interval.tv_usec = QUANTUM;
@@ -305,8 +309,8 @@ int worker_init()
 	// Note: if both of the following values are zero
 	//       the timer will not be active, and the timer
 	//       will never go off even if you set the interval value
-	timer.it_value.tv_usec = 0;
-	timer.it_value.tv_sec = 1;
+	timer.it_value.tv_usec = 10;
+	timer.it_value.tv_sec = 0;
 
 	// Set the timer up (start the timer)
 	setitimer(ITIMER_PROF, &timer, NULL);
@@ -468,12 +472,13 @@ void worker_exit(void *value_ptr)
 	struct timespec finish_time, diff;
 	clock_gettime(CLOCK_MONOTONIC, &finish_time);
     block->time_finish = finish_time;
-	pauseTimer();
-	// printf(" finished from worker_exit thread %d\n", *(n->t_block->id));
+	// pauseTimer();
 
-	queue_add(&runqueue, block);
-	queue_pop_node(&runqueue);
-	resumeTimer();
+	// printf(" finished from worker_exit thread %d\n", *(n->t_block->id));
+	// queue_add_node(&runqueue, n);
+	// queue_pop_node(&runqueue);
+	
+	// resumeTimer();
     diff.tv_sec = finish_time.tv_sec - block->time_arrival.tv_sec;
 	diff.tv_nsec = finish_time.tv_nsec - block->time_arrival.tv_nsec;
 	double elapsed_microseconds = (diff.tv_sec * 1000000) + (diff.tv_nsec / 1000);
@@ -510,15 +515,20 @@ int worker_join(worker_t thread, void **value_ptr)
 	}
 
 	// TODO free ucontext, block, stack
+	pauseTimer();
 	printf(GREEN "popping thread %d\n" RESET, *(n->t_block->id));
 
-	remove_node(&runqueue, n);
+	queue_pop_node(&runqueue);
 
 	free(n->t_block->context->uc_stack.ss_sp);
 	free(n->t_block->context);
 	free(n->t_block);
 	free(n);
+
+	printf(GREEN "pop finished!\n" RESET);
+
 	// queue_pop(&runqueue);
+	resumeTimer();
 
 	if (is_empty(&runqueue))
 		puts("runqueue is emptied");
@@ -549,6 +559,7 @@ int worker_mutex_lock(worker_mutex_t *mutex)
 	// context switch to the scheduler thread
 
 	// YOUR CODE HERE
+	
 	node *n = queue_front_node(&runqueue);
 	tcb *block = n->t_block;
 	if (mutex->status == UNLOCKED || *(mutex->thread_block->id) == *(block->id))
@@ -561,15 +572,16 @@ int worker_mutex_lock(worker_mutex_t *mutex)
 	{
 
 		// printf("LOCK OBTAINED BY THREAD %d!!!\n", *(mutex->thread_block->id));
-
-		queue_pop_node(&runqueue); // remove thread from runqueue
-
+		pauseTimer();
 		block_node *new_block_node = malloc(sizeof(block_node));
 		new_block_node->mutex = mutex;
 		new_block_node->current_thread = n;
+		new_block_node->current_thread->next = NULL;
 		new_block_node->current_thread->t_block->status = BLOCKED;
 		new_block_node->next = NULL;
+		queue_pop_node(&runqueue); // remove thread from runqueue
 		list_add(&blocklist, new_block_node); // record whole thread node on queue
+		resumeTimer();
 		swapcontext(n->t_block->context, &sched_ctx);
 	}
 
@@ -582,10 +594,11 @@ int worker_mutex_unlock(worker_mutex_t *mutex)
 	// - release mutex and make it available again.
 	// - put threads in block list to run queue
 	// so that they could compete for mutex later.
+	
 	if (mutex->status == LOCKED)
 	{
-		mutex->status = UNLOCKED;
 		block_node *pop;
+		pauseTimer();
 		while (!list_empty(&blocklist) && ((pop = list_find(&blocklist, mutex)) != NULL))
 		{
 			// release blocked threads to runqueue again
@@ -593,6 +606,8 @@ int worker_mutex_unlock(worker_mutex_t *mutex)
 			queue_add_node(&runqueue, pop->current_thread);
 			free(pop);
 		}
+		resumeTimer();
+		mutex->status = UNLOCKED;
 	}
 	// YOUR CODE HERE
 	return 0;
