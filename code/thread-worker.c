@@ -125,11 +125,11 @@ static void sched_psjf()
 			}
 			else if (block->status == DONE)
 			{
-				puts("queue not empty!!\n");
+				// puts("queue not empty!!\n");
 				queue_add_node(&runqueue, n);
 				queue_pop_node(&runqueue);
 				resumeTimer();
-				// printf("thread %d is done! pushing it back...\n", *(block->id));
+				printf("thread %d is done! pushing it back...\n", *(block->id));
 			}
 			else if (block->status == RUNNING)
 			{
@@ -143,7 +143,7 @@ static void sched_psjf()
 		else
 		{
 			puts("queue is empty\n");
-			resumeTimer();
+			// resumeTimer();
 			setcontext(&main_ctx);
 		}
 	}
@@ -269,7 +269,7 @@ static void ring(int signum)
 	}
 	else {
 		resumeTimer();
-		swapcontext(&caller_sched, &sched_ctx);
+		swapcontext(&main_ctx, &sched_ctx);
 	}
 	    
 }
@@ -474,7 +474,7 @@ void worker_exit(void *value_ptr)
     block->time_finish = finish_time;
 	// pauseTimer();
 
-	// printf(" finished from worker_exit thread %d\n", *(n->t_block->id));
+	printf(" finished from worker_exit thread %d\n", *(n->t_block->id));
 	// queue_add_node(&runqueue, n);
 	// queue_pop_node(&runqueue);
 	
@@ -574,12 +574,12 @@ int worker_mutex_lock(worker_mutex_t *mutex)
 		// printf("LOCK OBTAINED BY THREAD %d!!!\n", *(mutex->thread_block->id));
 		pauseTimer();
 		block_node *new_block_node = malloc(sizeof(block_node));
+		queue_pop_node(&runqueue); // remove thread from runqueue
 		new_block_node->mutex = mutex;
 		new_block_node->current_thread = n;
 		new_block_node->current_thread->next = NULL;
 		new_block_node->current_thread->t_block->status = BLOCKED;
 		new_block_node->next = NULL;
-		queue_pop_node(&runqueue); // remove thread from runqueue
 		list_add(&blocklist, new_block_node); // record whole thread node on queue
 		resumeTimer();
 		swapcontext(n->t_block->context, &sched_ctx);

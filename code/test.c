@@ -121,7 +121,8 @@ void critical2(worker_mutex_t* mutex) {
 	printf(YELLOW "!!!!obtaining lock in thread!!!!\n" RESET);
     // while (atomic_flag_test_and_set(&lock));  
 	worker_mutex_lock(mutex);
-    for (int i = 0; i < 2000000; i++) temp++;
+    for (int i = 0; i < 2000000; i++) 
+	temp++;
 	bank_account = 2000000;
 
     // release lock when finished with the critical section
