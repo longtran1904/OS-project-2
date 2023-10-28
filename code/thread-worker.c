@@ -114,7 +114,7 @@ static void sched_psjf()
 					block->time_response = response_time;
 					diff.tv_sec = response_time.tv_sec - block->time_arrival.tv_sec;
                     diff.tv_nsec = response_time.tv_nsec - block->time_arrival.tv_nsec;
-					double elapsed_microseconds = (diff.tv_sec * 1000000) + (diff.tv_nsec / 1000);
+					double elapsed_microseconds = (diff.tv_sec * 1000) + (diff.tv_nsec / 1000000);
 					total_resp_sum += elapsed_microseconds;
 					avg_resp_time = total_resp_sum/total_worker_threads;
 
@@ -122,6 +122,7 @@ static void sched_psjf()
 				block->status = RUNNING;
 				// printf("Executing thread %d\n", *(block->id));
 				resumeTimer();
+				tot_cntx_switches++;
 				setcontext(block->context);
 			}
 			else if (block->status == DONE)
@@ -133,12 +134,14 @@ static void sched_psjf()
 				queue_add_node(&runqueue, n);
 				// show_queue(&runqueue);
 				resumeTimer();
+				tot_cntx_switches++;
 				setcontext(&main_ctx);
 			}
 			else if (block->status == RUNNING)
 			{
 				printf("thread %d is running... continue...\n", *(block->id));
 				resumeTimer();
+				tot_cntx_switches++;
 				setcontext(&caller_sched);
 			}
 			// printf("freeing heap from thread\n");
@@ -148,6 +151,7 @@ static void sched_psjf()
 		{
 			puts("queue is empty\n");
 			// resumeTimer();
+			tot_cntx_switches++;
 			setcontext(&main_ctx);
 		}
 	}
@@ -215,7 +219,7 @@ static void sched_mlfq()
 					block->time_response = response_time;
 					diff.tv_sec = response_time.tv_sec - block->time_arrival.tv_sec;
                     diff.tv_nsec = response_time.tv_nsec - block->time_arrival.tv_nsec;
-					double elapsed_microseconds = (diff.tv_sec * 1000000) + (diff.tv_nsec / 1000);
+					double elapsed_microseconds = (diff.tv_sec * 1000) + (diff.tv_nsec / 1000000);
 					total_resp_sum += elapsed_microseconds;
 					avg_resp_time = total_resp_sum/total_worker_threads;
 
@@ -225,6 +229,7 @@ static void sched_mlfq()
 			add_front(&runqueue, nextToRun);
 			queue_pop_node(mlfq[nextToRun->t_block->priority]);
 			resumeTimer();
+			tot_cntx_switches++;
 			swapcontext(&sched_ctx, nextToRun->t_block->context);
 		}
 	}
@@ -251,7 +256,7 @@ static void ring(int signum)
 		queue_add_node(&runqueue, n);
 		
 		resumeTimer();
-
+        tot_cntx_switches++;
 		swapcontext(n->t_block->context, &sched_ctx);
 #else
 
@@ -267,12 +272,13 @@ static void ring(int signum)
 		queue_add_node(&mlfq[n->t_block->priority], n);
 
 		resumeTimer();
-
+        tot_cntx_switches++;
 		swapcontext(n->t_block->context, &sched_ctx);
 #endif
 	}
 	else {
 		resumeTimer();
+	    tot_cntx_switches++;	
 		swapcontext(&main_ctx, &sched_ctx);
 	}
 	    
@@ -462,6 +468,7 @@ int worker_yield()
 	printf(GREEN "thread #%d yielding...\n" RESET, *(n->t_block->id));
 
     resumeTimer();
+	tot_cntx_switches++;
 	swapcontext(n->t_block->context, &sched_ctx);
 	return 0;
 };
@@ -487,7 +494,7 @@ void worker_exit(void *value_ptr)
 	// resumeTimer();
     diff.tv_sec = finish_time.tv_sec - block->time_arrival.tv_sec;
 	diff.tv_nsec = finish_time.tv_nsec - block->time_arrival.tv_nsec;
-	double elapsed_microseconds = (diff.tv_sec * 1000000) + (diff.tv_nsec / 1000);
+	double elapsed_microseconds = (diff.tv_sec * 1000) + (diff.tv_nsec / 1000000);
 	total_turn_sum += elapsed_microseconds;
 	avg_turn_time = total_turn_sum/total_worker_threads;
 
@@ -592,6 +599,7 @@ int worker_mutex_lock(worker_mutex_t *mutex)
 		new_block_node->next = NULL;
 		list_add(&blocklist, new_block_node); // record whole thread node on queue
 		resumeTimer();
+		tot_cntx_switches++;
 		swapcontext(n->t_block->context, &sched_ctx);
 	}
 

@@ -87,6 +87,7 @@ void verify() {
 		}
 		fclose(f);
 	}
+	fprintf(stderr , "Total verified sum is: %d\n", sum);
 }
 
 
@@ -138,7 +139,7 @@ int main(int argc, char **argv) {
 
         clock_gettime(CLOCK_REALTIME, &end);
 
-        printf("Total run time: %lu micro-seconds\n",
+        printf("Total run time: %lu milli-seconds\n",
                (end.tv_sec - start.tv_sec) * 1000 + (end.tv_nsec - start.tv_nsec) / 1000000);
 
 	pthread_mutex_destroy(&mutex);
@@ -149,6 +150,7 @@ int main(int argc, char **argv) {
 	free(mem);
 	free(thread);
 	free(counter);
+
 
 #ifdef USE_WORKERS
 	fprintf(stderr , "Total sum is: %d\n", sum);
