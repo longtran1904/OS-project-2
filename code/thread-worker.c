@@ -99,6 +99,7 @@ static void sched_psjf()
 			move_lowest_quantum_to_front(&runqueue);
 
 			node *n = queue_front_node(&runqueue); // pop from queue - choose job to work
+			// printf("Lowest quantum_counter node is %d with %d-quanta\n", n->t_block->num_thread, n->t_block->quantum_counter);
 			// deciphering to get and set context)
 			tcb *block = n->t_block;
 			
@@ -126,10 +127,13 @@ static void sched_psjf()
 			else if (block->status == DONE)
 			{
 				// puts("queue not empty!!\n");
-				queue_add_node(&runqueue, n);
-				queue_pop_node(&runqueue);
-				resumeTimer();
 				printf("thread %d is done! pushing it back...\n", *(block->id));
+				n->t_block->quantum_counter++;
+				queue_pop_node(&runqueue);
+				queue_add_node(&runqueue, n);
+				// show_queue(&runqueue);
+				resumeTimer();
+				setcontext(&main_ctx);
 			}
 			else if (block->status == RUNNING)
 			{
@@ -231,7 +235,7 @@ static void ring(int signum)
 	pauseTimer();
 	switch_context = 1;
 	tot_cntx_switches++;
-	printf(YELLOW "RING RING! The timer has gone off\n" RESET);
+	// printf(YELLOW "RING RING! The timer has gone off\n" RESET);
 	node *n = queue_front_node(&runqueue);
 
 	if ((n != NULL) && (n->t_block->status == RUNNING))
@@ -406,6 +410,8 @@ int worker_create(worker_t *thread, pthread_attr_t *attr,
 	block->num_thread = total_worker_threads;
 	total_worker_threads++;
 
+	resumeTimer(); // Start timer
+
 // push thread to run queue
 #ifndef MLFQ // then PSJF
 	queue_add(&runqueue, block);
@@ -526,12 +532,16 @@ int worker_join(worker_t thread, void **value_ptr)
 	free(n);
 
 	printf(GREEN "pop finished!\n" RESET);
+	show_queue(&runqueue);
 
 	// queue_pop(&runqueue);
 	resumeTimer();
 
-	if (is_empty(&runqueue))
+	if (is_empty(&runqueue)){
 		puts("runqueue is emptied");
+		pauseTimer();
+	}
+		
 
 	return 0;
 };

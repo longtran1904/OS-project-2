@@ -6,13 +6,23 @@ typedef struct node {
     struct node* next; 
 } node;
 
+void show_queue(node** head) {
+    node* current = *head;
+    printf("   !!!! RUNQUEUE STATUS !!!!!!\n");
+    while (current != NULL) {
+        printf("%d -> ", current->t_block->num_thread);
+        current = current->next;
+    }
+
+    printf("NULL\n");
+}
 
 bool is_empty(node** head){
     return (*head == NULL);
 }
 
 void queue_add_node(node** head, node* new_node){
-    printf("adding thread %d to queue!!\n", *(new_node->t_block->id));
+    // printf("adding thread %d to queue!!\n", *(new_node->t_block->id));
     new_node->next = NULL;
     if (*head == NULL) {
         *head = new_node;
@@ -27,7 +37,7 @@ void queue_add_node(node** head, node* new_node){
 }
 
 void queue_pop_node(node** head){
-    printf("poping thread %d from the queue\n", *((*head)->t_block->id));
+    // printf("poping thread %d from the queue\n", *((*head)->t_block->id));
     if (*head == NULL) return;
     *head = (*head)->next;
 }
