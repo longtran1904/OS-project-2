@@ -26,7 +26,7 @@ block_list.o:
 	$(CC) $(CFLAGS) block_list.c
 
 test: thread-worker.c test.c
-	$(CC) -g -DPSJF $^ -o test
+	$(CC) -g -DMLFQ $^ -o test
 
 clean:
 	rm -rf testfile *.o *.a

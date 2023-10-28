@@ -140,7 +140,7 @@ int main(int argc, char **argv) {
 
 	worker_t thread1, thread2, thread3, thread4;
 	int stat;
-	// stat = worker_create(&thread1, NULL, (void*) PrintHelloYield, (void *)0);
+	// stat = worker_create(&thread1, NULL, (void*) PrintHello, (void *)0);
 	// if (stat == 0){
 	// 	printf("thread %d created!! value: %d\n", thread1, thread1);
 	// }

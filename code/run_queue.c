@@ -1,6 +1,8 @@
 #include "thread-worker.h"
 #include <stdbool.h>
 
+int count = 0;
+
 typedef struct node {
     tcb* t_block;
     struct node* next; 
@@ -8,10 +10,12 @@ typedef struct node {
 
 void show_queue(node** head) {
     node* current = *head;
-    printf("   !!!! RUNQUEUE STATUS !!!!!!\n");
+    count = 0;
+    // printf("   !!!! RUNQUEUE STATUS !!!!!!\n");
     while (current != NULL) {
-        printf("%d -> ", current->t_block->num_thread);
+        printf("{%d, status: %d, #node: %d} -> ", current->t_block->num_thread, current->t_block->status, count);
         current = current->next;
+        count++;
     }
 
     printf("NULL\n");
