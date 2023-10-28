@@ -122,7 +122,5 @@ int main(int argc, char **argv) {
         fprintf(stderr, "***************************\n");
 #endif
 
-    puts("hello world\n");
-
 	return 0;
 }

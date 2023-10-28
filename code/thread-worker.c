@@ -128,7 +128,7 @@ static void sched_psjf()
 			else if (block->status == DONE)
 			{
 				// puts("queue not empty!!\n");
-				printf("thread %d is done! pushing it back...\n", *(block->id));
+				// printf("thread %d is done! pushing it back...\n", *(block->id));
 				n->t_block->quantum_counter++;
 				queue_pop_node(&runqueue);
 				queue_add_node(&runqueue, n);
@@ -139,7 +139,7 @@ static void sched_psjf()
 			}
 			else if (block->status == RUNNING)
 			{
-				printf("thread %d is running... continue...\n", *(block->id));
+				// printf("thread %d is running... continue...\n", *(block->id));
 				resumeTimer();
 				tot_cntx_switches++;
 				setcontext(&caller_sched);
@@ -149,7 +149,7 @@ static void sched_psjf()
 		}
 		else
 		{
-			puts("queue is empty\n");
+			// puts("queue is empty\n");
 			// resumeTimer();
 			tot_cntx_switches++;
 			setcontext(&main_ctx);
@@ -191,11 +191,11 @@ static void sched_mlfq()
 		node *nextToRun = NULL;
 		// printf("   RUNQUEUE STATUS   \n");
 		// show_queue(&runqueue); printf("\n");
-		printf("   MLFQ STATUS    \n");
-		printf(" queue[0] "); show_queue(&mlfq[0]); printf("\n");
-		printf(" queue[1] "); show_queue(&mlfq[1]); printf("\n");
-		printf(" queue[2] "); show_queue(&mlfq[2]); printf("\n");
-		printf(" queue[3] "); show_queue(&mlfq[3]); printf("\n");
+		// printf("   MLFQ STATUS    \n");
+		// printf(" queue[0] "); show_queue(&mlfq[0]); printf("\n");
+		// printf(" queue[1] "); show_queue(&mlfq[1]); printf("\n");
+		// printf(" queue[2] "); show_queue(&mlfq[2]); printf("\n");
+		// printf(" queue[3] "); show_queue(&mlfq[3]); printf("\n");
 		for (int i = 0; i < 4 && nextToRun == NULL; i++)
 		{
 			nextToRun = queue_front_node(&mlfq[i]);
@@ -213,13 +213,13 @@ static void sched_mlfq()
 		if (nextToRun == NULL)
 		{
 			// mlfq_done = 1; // nothing to run -> mlfq is done
-			printf("MLFQ has nothing to run...\n");
+			// printf("MLFQ has nothing to run...\n");
 			// rotate runqueue for worker_join()
 			node* n = queue_front_node(&runqueue);
 			if (n != NULL) {
 				queue_add_node(&runqueue, n);
 				queue_pop_node(&runqueue);
-				printf("pushing thread %d to back...\n", n->t_block->num_thread);
+				// printf("pushing thread %d to back...\n", n->t_block->num_thread);
 			}
 			// printf(" RUNQUEUE \n");
 			// show_queue(&runqueue);
@@ -262,7 +262,7 @@ static void ring(int signum)
 	pauseTimer();
 	switch_context = 1;
 	tot_cntx_switches++;
-	printf(YELLOW "RING RING! The timer has gone off\n" RESET);
+	// printf(YELLOW "RING RING! The timer has gone off\n" RESET);
 	node *n = queue_front_node(&runqueue);
 	// printf("   RUNQUEUE STATUS   \n");
 	// show_queue(&runqueue); printf("\n");
@@ -493,7 +493,7 @@ int worker_yield()
 	queue_add_node(&mlfq[n->t_block->priority], n);
 #endif
 
-	printf(GREEN "thread #%d yielding...\n" RESET, *(n->t_block->id));
+	// printf(GREEN "thread #%d yielding...\n" RESET, *(n->t_block->id));
 
     resumeTimer();
 	swapcontext(n->t_block->context, &sched_ctx);
@@ -514,7 +514,7 @@ void worker_exit(void *value_ptr)
     block->time_finish = finish_time;
 	// pauseTimer();
 
-	printf(" finished from worker_exit thread %d\n", *(n->t_block->id));
+	// printf(" finished from worker_exit thread %d\n", *(n->t_block->id));
 	// queue_add_node(&runqueue, n);
 	// queue_pop_node(&runqueue);
 	
@@ -542,7 +542,7 @@ int worker_join(worker_t thread, void **value_ptr)
 	// - de-allocate any dynamic memory created by the joining thread
 	// YOUR CODE HERE
 	node *n = queue_front_node(&runqueue);
-	printf("waiting for thread %d\n", thread);
+	// printf("waiting for thread %d\n", thread);
 	if (getcontext(&main_ctx) < 0)
 	{
 		perror("get main_ctx");
@@ -564,9 +564,9 @@ int worker_join(worker_t thread, void **value_ptr)
 		// 	}
 		// #endif
 		n = queue_front_node(&runqueue);
-		printf("waiting for thread %d \n", thread);
+		// printf("waiting for thread %d \n", thread);
 		if (n!=NULL && *(n->t_block->id) != thread){
-			printf("got thread %d\n", n->t_block->num_thread);
+			// printf("got thread %d\n", n->t_block->num_thread);
 			swapcontext(&main_ctx, &sched_ctx);
 		}
 		// printf("returned to worker_join()!!! spin lock!!!");
@@ -574,7 +574,7 @@ int worker_join(worker_t thread, void **value_ptr)
 
 	// TODO free ucontext, block, stack
 	pauseTimer();
-	printf(GREEN "popping thread %d\n" RESET, *(n->t_block->id));
+	// printf(GREEN "popping thread %d\n" RESET, *(n->t_block->id));
 
 	queue_pop_node(&runqueue);
 
@@ -583,7 +583,7 @@ int worker_join(worker_t thread, void **value_ptr)
 	free(n->t_block);
 	free(n);
 
-	printf(GREEN "pop finished!\n" RESET);
+	// printf(GREEN "pop finished!\n" RESET);
 	// show_queue(&runqueue);
 
 	// queue_pop(&runqueue);
@@ -591,7 +591,7 @@ int worker_join(worker_t thread, void **value_ptr)
 
 #ifndef MLFQ
 	if (is_empty(&runqueue)){
-		puts("runqueue is emptied");
+		// puts("runqueue is emptied");
 		pauseTimer();
 	}
 #else 
@@ -601,7 +601,7 @@ int worker_join(worker_t thread, void **value_ptr)
 			nextToRun = queue_front_node(&mlfq[i]);
 
 	if (nextToRun == NULL && is_empty(&runqueue)){
-		puts("MLFQ is emptied | Nothing left to run");
+		// puts("MLFQ is emptied | Nothing left to run");
 		pauseTimer();
 	}
 #endif
