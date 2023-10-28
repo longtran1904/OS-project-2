@@ -101,7 +101,7 @@ int main(int argc, char **argv) {
 
 	clock_gettime(CLOCK_REALTIME, &end);
 
-        printf("Total run time: %lu micro-seconds\n", 
+        printf("Total run time: %lu mili-seconds\n", 
 	       (end.tv_sec - start.tv_sec) * 1000 + (end.tv_nsec - start.tv_nsec) / 1000000);
 
 	// mutex destroy
